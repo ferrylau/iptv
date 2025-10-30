@@ -10,7 +10,7 @@ from typing import List, Dict, Tuple, Any
 # --- 配置 ---
 M3U_URL = "https://iptv-org.github.io/iptv/index.country.m3u"
 INPUT_FILE_NAME = "index.country.m3u8" # 临时下载文件
-OUTPUT_FILE_NAME = "index.chinese_cleaned_and_translated.m3u8" # 最终输出文件
+OUTPUT_FILE_NAME = "index.country.chinese.m3u8" # 最终输出文件
 SOURCE_LANG = 'en'
 TARGET_LANG = 'zh-CN'
 TRANSLATION_DELAY = 0.1 # 线程启动间的延迟（秒），用于翻译步骤
