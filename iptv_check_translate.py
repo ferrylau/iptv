@@ -14,7 +14,7 @@ OUTPUT_FILE_NAME = "index.country.chinese.m3u8" # 最终输出文件
 SOURCE_LANG = 'en'
 TARGET_LANG = 'zh-CN'
 TRANSLATION_DELAY = 0.1 # 线程启动间的延迟（秒），用于翻译步骤
-MAX_WORKERS = 100        # 并发线程数：用于流检查和翻译，高风险设置
+MAX_WORKERS = 99        # 并发线程数：用于流检查和翻译，高风险设置
 TIMEOUT = 5             # 流检查时的请求超时时间（秒）
 
 # 硬编码的国家分组对照表
