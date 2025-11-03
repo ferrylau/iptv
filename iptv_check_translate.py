@@ -11,16 +11,25 @@ from deep_translator import GoogleTranslator
 from requests.exceptions import RequestException
 import sys # 新增：用于错误输出
 
-OUTPUT_FILE_NAME = "global_tv.m3u" # 最终输出文件
-# 中国 M3U 源列表配置 (元组: (URL, 临时文件名))
+# OUTPUT_FILE_NAME = "global_tv.m3u" # 最终输出文件
+OUTPUT_FILE_NAME = "china_extra_tv.m3u" # 最终输出文件
+# 中国 M3U 源列表配置 (元组: (URL, 文件类型))
 M3U_SOURCES: List[Tuple[str, str]] = [
     # 全球源
-    ("https://iptv-org.github.io/iptv/index.country.m3u","m3u"),
+    # ("https://iptv-org.github.io/iptv/index.country.m3u","m3u"),
 
-    # 示例：第二个中国源
-    # ("https://raw.githubusercontent.com/Guovin/iptv-api/gd/output/ipv6/result.m3u", "m3u"),    
-    # ("https://raw.githubusercontent.com/fanmingming/live/refs/heads/main/tv/m3u/ipv6.m3u", "m3u"),
-    # ("https://raw.githubusercontent.com/wcb1969/iptv/refs/heads/main/18%2B.txt", "txt"),
+    #("https://raw.githubusercontent.com/wcb1969/iptv/refs/heads/main/%E7%94%B5%E4%BF%A1IPTV.txt", "txt"),
+
+    # china & hk & tw & other
+    ('https://epg.pw/test_channels.m3u','m3u'),
+    ('https://epg.pw/test_channels_hong_kong.m3u','m3u'),
+    ('https://epg.pw/test_channels_macau.m3u','m3u'),
+
+    ('https://epg.pw/test_channels_taiwan.m3u','m3u'),
+    ('https://iptv-org.github.io/iptv/countries/tw.m3u','m3u'),
+
+    ('https://epg.pw/test_channels_singapore.m3u','m3u'),
+    ('https://epg.pw/test_channels_malaysia.m3u','m3u'),
 ]
 
 SOURCE_LANG = 'en'
@@ -32,12 +41,12 @@ IP_API_BASE_URL = "http://ip-api.com/json/"
 IP_RATE_LIMIT_DELAY = 1.5 # 每次 IP 查询之间等待 1.5 秒以遵守 ip-api.com 的免费限制
 
 # 并发配置
-MAX_WORKERS = 50      # 并发线程数：用于翻译
+MAX_WORKERS = 30      # 并发线程数：用于翻译
 TIMEOUT = 5          # 默认请求超时时间（秒）
 
 # 新增：流可用性检查配置
-STREAM_CHECK_WORKERS = 80 # 并发线程数：用于流检查
-STREAM_CHECK_TIMEOUT = 10  # 检查超时时间（秒），用于快速判断连接
+STREAM_CHECK_WORKERS = 30 # 并发线程数：用于流检查
+STREAM_CHECK_TIMEOUT = 5  # 检查超时时间（秒），用于快速判断连接
 FFMPEG_BINARY = "ffmpeg"  # FFmpeg 可执行文件名称 (通常在系统 PATH 中)
 
 # 硬编码的国家分组对照表 (英文 -> 中文)
@@ -114,13 +123,13 @@ def get_filename_from_url(url: str) -> str:
         解码后的文件名字符串，如果失败则返回 "External Source"。
     """
     try:
-        parsed_url = urlparse(url)
+        parsed_url = urllib.parse.urlparse(url)
         # 获取路径的最后一段
         path = parsed_url.path
         filename_encoded = os.path.basename(path)
         
         # URL 解码，以处理中文文件名（例如 %E7%9B%B4%E6%92%AD%E6%BA%90）
-        filename = unquote(filename_encoded)
+        filename = urllib.parse.unquote(filename_encoded)
         
         return filename if filename else "External Source"
     except Exception as e:
@@ -270,36 +279,82 @@ def get_geo_info_for_classification(ip_or_domain: str) -> str:
         return "Error"
 
 def parse_m3u_blocks(content: str) -> List[Dict[str, str]]:
-    """将 M3U 内容解析为 (EXTINF, URL, group-title) 频道块列表。"""
+    """
+    将 M3U/M3U8 内容解析为频道块列表。
+    
+    核心逻辑修改：
+    1. 优先提取 'tvg-country' 的值作为分类 (group)。
+    2. 如果 'tvg-country' 不存在，则回退到 'group-title' 的值。
+    """
 
-    # 正则表达式匹配 #EXTINF:... 后面的 URL
-    # group 1: 完整的 #EXTINF 行
-    # group 2: 频道名称 (在 , 后面，换行符之前)
-    # group 3: URL
-    pattern = re.compile(r'(#EXTINF:.*?,\s*([^,\n]+))(?:\s*|[\n\r]+)(http[^#\s]+)', re.IGNORECASE)
-    # 正则表达式用于提取 group-title
+    # 正则表达式匹配 #EXTINF:... 后面的 URL。
+    # Group 1: 完整的 #EXTINF 行，直到逗号 (,)
+    # Group 2: 频道名称 (在最后一个逗号 , 后面，换行符之前)
+    # Group 3: URL (任意非空白字符)
+    pattern = re.compile(
+        r'(#EXTINF:.*?,\s*([^,\n]+))'   # 匹配 EXTINF 行及频道名称
+        r'(?:\s*|[\n\r]+)'              # 匹配 EXTINF 行和 URL 之间的分隔符 (空白或换行)
+        r'(\S+)',                       # 匹配 URL (任意非空白字符)
+        re.IGNORECASE | re.DOTALL
+    )
+
+    # 正则表达式用于提取 group-title 属性 (作为后备分类)
     group_title_pattern = re.compile(r'group-title="([^"]*)"', re.IGNORECASE)
+    
+    # 新增：正则表达式用于提取 tvg-country 属性 (作为优先分类)
+    tvg_country_pattern = re.compile(r'tvg-country="([^"]*)"', re.IGNORECASE)
+    # 新增：正则表达式用于提取 tvg-name 属性
+    tvg_name_pattern = re.compile(r'tvg-name="([^"]*)"', re.IGNORECASE)
+    # 新增：正则表达式用于提取 tvg-logo 属性
+    tvg_logo_pattern = re.compile(r'tvg-logo="([^"]*)"', re.IGNORECASE)
+
 
     blocks = []
+    
     for match in pattern.finditer(content):
         extinf_line = match.group(1).strip()
         channel_name = match.group(2).strip()
         url = match.group(3).strip()
 
-        # 提取 group-title
+        # 1. 提取 tvg-country (优先)
+        country_match = tvg_country_pattern.search(extinf_line)
+        tvg_country = country_match.group(1).strip() if country_match else ''
+        
+        # 2. 提取 group-title (后备)
         group_match = group_title_pattern.search(extinf_line)
-        group_title = group_match.group(1) if group_match else 'Undefined'
+        original_group_title = group_match.group(1).strip() if group_match else 'Undefined'
+        
+        # 3. 确定最终分类：如果 tvg_country 存在，则覆盖 group-title
+        final_group = tvg_country if tvg_country else original_group_title
+        
+        # 提取其他可选属性
+        tvg_name_match = tvg_name_pattern.search(extinf_line)
+        tvg_name = tvg_name_match.group(1).strip() if tvg_name_match else ''
+
+        tvg_logo_match = tvg_logo_pattern.search(extinf_line)
+        tvg_logo = tvg_logo_match.group(1).strip() if tvg_logo_match else ''
+
+        new_tag = f'group-title="{final_group}"'        
+        if group_title_pattern.search(extinf_line):
+            extinf_line = group_title_pattern.sub(new_tag, extinf_line)
+        else:
+            # 如果没有 group-title 属性，则尝试在 #EXTINF:-1 后添加
+            extinf_line = extinf_line.replace('#EXTINF:-1', f'#EXTINF:-1 {new_tag}', 1)
 
         blocks.append({
             'extinf': extinf_line,
             'url': url,
             'name': channel_name,
-            'group': group_title,
-            # 'status': 'N/A'
+            # 核心修改：使用优先逻辑确定的分类
+            'group': final_group, 
+            'tvg_name': tvg_name,
+            'tvg_logo': tvg_logo,
+            # 也可以保留原始属性以供调试，但根据需求，这里只输出 final_group
         })
 
     if not blocks:
-        print("❌ 警告：未在文件中找到任何有效的频道和 URL 组合。")
+        # ⚠️ 注意：在生产环境中，这应该使用 logging 模块
+        print("❌ 警告：未在文件中找到任何有效的频道和 URL 组合。") 
 
     return blocks
 
@@ -349,10 +404,11 @@ def worker_check_stream(stream: Dict[str, str], index: int, total_count: int) ->
         process_timeout = STREAM_CHECK_TIMEOUT + 5
         result = subprocess.run(
             command, 
-            timeout=process_timeout,
+            timeout=process_timeout, # 假设您采用了上一轮回复中的 process_timeout
             capture_output=True, 
             check=False,
-            text=True
+            text=True,
+            encoding='utf-8', # <-- 🚀 明确指定 UTF-8 编码
         )
         
         # --- 优化后的判断逻辑 ---
