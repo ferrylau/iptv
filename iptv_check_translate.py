@@ -25,7 +25,7 @@ M3U_SOURCES: List[Tuple[str, str]] = [
 
 SOURCE_LANG = 'en'
 TARGET_LANG = 'zh-CN'
-TRANSLATION_DELAY = 0.05 # 线程启动间的延迟（秒），用于翻译步骤
+TRANSLATION_DELAY = 0.1 # 线程启动间的延迟（秒），用于翻译步骤
 
 # IP 地理位置 API 配置
 IP_API_BASE_URL = "http://ip-api.com/json/"
@@ -313,12 +313,22 @@ def worker_check_stream(stream: Dict[str, str], index: int, total_count: int) ->
     url = stream['url']
     is_working = False
     
-    # FFmpeg 命令: 尝试读取输入流，持续 STREAM_CHECK_TIMEOUT 秒，输出到 null，只显示致命错误
-    # '-t' 限制 FFmpeg 仅读取前 N 秒的数据
+    # --- 关键优化：增强 FFmpeg 的网络连接健壮性 ---
+    # 1. '-reconnect 1': 启用自动重连（重要）
+    # 2. '-reconnect_streamed 1': 强制重连流数据
+    # 3. '-reconnect_delay_max 5': 设定最大重连延迟（防止无限阻塞）
+    # 4. '-analyzeduration 1000000': 限制流分析的时间为 1MB (默认可能太长)
+    # 5. '-probesize 1000000': 限制探测大小为 1MB (默认可能太长)
+    
     command = [
         FFMPEG_BINARY, 
         '-hide_banner', # 隐藏 FFmpeg 版本信息
         '-v', 'error',  # 只输出错误信息
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
+        '-analyzeduration', '1000000',
+        '-probesize', '1000000',
         '-i', url, 
         '-t', str(STREAM_CHECK_TIMEOUT), 
         '-f', 'null', 
@@ -334,18 +344,20 @@ def worker_check_stream(stream: Dict[str, str], index: int, total_count: int) ->
 
     try:
         # 执行 FFmpeg 命令
-        # check=False: 即使 FFmpeg 内部因流中断而退出（非致命错误），Python 也不抛出异常
+        # check=False: 允许 FFmpeg 内部因流中断而退出而不抛出 Python 异常
+        # timeout: 整个进程运行的最大时间。STREAM_CHECK_TIMEOUT (读取时间) + 5秒 (网络握手/重连缓冲)
+        process_timeout = STREAM_CHECK_TIMEOUT + 5
         result = subprocess.run(
             command, 
-            timeout=STREAM_CHECK_TIMEOUT + 2, # 给 subprocess 额外 2 秒时间来清理 FFmpeg 进程
+            timeout=process_timeout,
             capture_output=True, 
             check=False,
             text=True
         )
         
-        # FFmpeg 成功读取流并退出时通常返回 0 或 1 
-        # (对于 HLS/dash 流，读取到 EOF 或达到 '-t' 限制可能会返回 1)
-        # 任何其他非致命错误，只要能成功连接并解析流，都算作可用 (return code 0 或 1)
+        # --- 优化后的判断逻辑 ---
+        # 即使 FFmpeg 报告了一些错误 (stderr 不为空)，只要它能读取到数据并正常退出 (0 或 1)，
+        # 我们就认为它是可用的，因为大多数不稳定的流都会在 stderr 中留下警告或非致命错误。
         if result.returncode in [0, 1]:
             is_working = True
         else:
@@ -545,7 +557,7 @@ def translate_channels_concurrent(unique_names: List[str]) -> Dict[str, str]:
             )
             futures.append(future)
             # 线程启动间添加延迟，避免瞬间发送过多请求导致封锁
-            time.sleep(TRANSLATION_DELAY / MAX_WORKERS) 
+            time.sleep(TRANSLATION_DELAY) 
 
         # 收集所有已完成的翻译结果
         for future in as_completed(futures):
