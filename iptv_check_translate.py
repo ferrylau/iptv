@@ -3,44 +3,42 @@ import re
 import urllib.parse
 import time
 import os
+import subprocess # 新增：用于执行 FFmpeg 命令行工具
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from typing import List, Dict, Tuple, Any
 from deep_translator import GoogleTranslator
+from requests.exceptions import RequestException
+import sys # 新增：用于错误输出
 
-# ===============================================
-# 步骤 1: 配置
-# ===============================================
+OUTPUT_FILE_NAME = "global_tv.m3u" # 最终输出文件
+# 中国 M3U 源列表配置 (元组: (URL, 临时文件名))
+M3U_SOURCES: List[Tuple[str, str]] = [
+    # 全球源
+    ("https://iptv-org.github.io/iptv/index.country.m3u","m3u"),
 
-# M3U 文件源配置
-M3U_URL = "https://iptv-org.github.io/iptv/index.country.m3u"
-INPUT_FILE_NAME = "index.country.m3u" # 临时下载文件 (主源)
-
-# 中间文件配置 (新)
-INTERMEDIATE_FILE_NAME = "merged_streams_for_check.m3u" # 阶段 1 输出，供外部检查
-INPUT_CLEANED_FILE_NAME = "cleaned_streams.m3u"        # 阶段 2 输入，用户清理后的文件
-
-# --- 更改配置：中国 M3U 源列表 ---
-CHINA_M3U_SOURCES: List[Tuple[str, str]] = [
-    # 您原来提供的第一个中国源
-    ("https://raw.githubusercontent.com/Guovin/iptv-api/gd/output/ipv6/result.m3u", "ipv6_result.m3u"),
-    # 示例：第二个中国源 (请替换为您真实的 URL)
-    ("https://raw.githubusercontent.com/fanmingming/live/refs/heads/main/tv/m3u/ipv6.m3u", "china_source_2.m3u"), 
+    # 示例：第二个中国源
+    # ("https://raw.githubusercontent.com/Guovin/iptv-api/gd/output/ipv6/result.m3u", "m3u"),    
+    # ("https://raw.githubusercontent.com/fanmingming/live/refs/heads/main/tv/m3u/ipv6.m3u", "m3u"),
+    # ("https://raw.githubusercontent.com/wcb1969/iptv/refs/heads/main/18%2B.txt", "txt"),
 ]
-# -----------------------------------------------------
 
-OUTPUT_FILE_NAME = "index.country.chinese.m3u" # 最终输出文件
 SOURCE_LANG = 'en'
 TARGET_LANG = 'zh-CN'
-TRANSLATION_DELAY = 0.1 # 线程启动间的延迟（秒），用于翻译步骤
+TRANSLATION_DELAY = 0.05 # 线程启动间的延迟（秒），用于翻译步骤
 
 # IP 地理位置 API 配置
 IP_API_BASE_URL = "http://ip-api.com/json/"
 IP_RATE_LIMIT_DELAY = 1.5 # 每次 IP 查询之间等待 1.5 秒以遵守 ip-api.com 的免费限制
 
 # 并发配置
-MAX_WORKERS = 50    # 并发线程数：用于翻译
-TIMEOUT = 5          # 请求超时时间（秒）
+MAX_WORKERS = 50      # 并发线程数：用于翻译
+TIMEOUT = 5          # 默认请求超时时间（秒）
+
+# 新增：流可用性检查配置
+STREAM_CHECK_WORKERS = 80 # 并发线程数：用于流检查
+STREAM_CHECK_TIMEOUT = 10  # 检查超时时间（秒），用于快速判断连接
+FFMPEG_BINARY = "ffmpeg"  # FFmpeg 可执行文件名称 (通常在系统 PATH 中)
 
 # 硬编码的国家分组对照表 (英文 -> 中文)
 COUNTRY_MAPPING = {
@@ -62,8 +60,7 @@ COUNTRY_MAPPING = {
     "Ethiopia": "埃塞俄比亚", "Faroe Islands": "法罗群岛", "Finland": "芬兰", "France": "法国",
     "French Polynesia": "法属波利尼西亚", "Gabon": "加蓬", "Gambia": "冈比亚", "Georgia": "格鲁吉亚",
     "Germany": "德国", "Ghana": "加纳", "Greece": "希腊", "Guadeloupe": "瓜德罗普",
-    "Guam": "关岛", "Guatemala": "危地马拉", "Guernsey": "根西岛", "Guinea": "几内内",
-    "Guyana": "圭亚那", "Haiti": "海地", "Honduras": "洪都拉斯", "Hong Kong": "香港",
+    "Guam": "关岛", "Guatemala": "危地马拉", "Honduras": "洪都拉斯", "Hong Kong": "香港",
     "Hungary": "匈牙利", "Iceland": "冰岛", "India": "印度", "Indonesia": "印度尼西亚",
     "International": "国际", "Iran": "伊朗", "Iraq": "伊拉克", "Ireland": "爱尔兰",
     "Israel": "以色列", "Italy": "意大利", "Ivory Coast": "科特迪瓦", "Jamaica": "牙买加",
@@ -97,17 +94,154 @@ COUNTRY_MAPPING = {
     "Yemen": "也门", "Zambia": "赞比亚", "Zimbabwe": "津巴布韦"
 }
 
-# 用于线程安全的打印 (仅用于翻译步骤)
+# 用于线程安全的打印
 print_lock = threading.Lock()
 
-# --- GeoIP 和 M3U 解析工具函数 ---
+# --------------------------------------------------------------------------
+# M3U TXT 源整合器
+# 该脚本用于从远程 TXT 文件（格式：频道名,链接）获取数据，
+# 并将其转换为标准的 M3U 格式列表。
+# --------------------------------------------------------------------------
+
+def get_filename_from_url(url: str) -> str:
+    """
+    从完整的 URL 中提取并解码文件名，作为 M3U 的 group-title。
+
+    Args:
+        url: 外部 TXT 源文件的完整 URL。
+
+    Returns:
+        解码后的文件名字符串，如果失败则返回 "External Source"。
+    """
+    try:
+        parsed_url = urlparse(url)
+        # 获取路径的最后一段
+        path = parsed_url.path
+        filename_encoded = os.path.basename(path)
+        
+        # URL 解码，以处理中文文件名（例如 %E7%9B%B4%E6%92%AD%E6%BA%90）
+        filename = unquote(filename_encoded)
+        
+        return filename if filename else "External Source"
+    except Exception as e:
+        print(f"Error parsing URL: {e}", file=sys.stderr)
+        return "External Source"
+
+def fetch_and_parse_txt(url: str) -> list:
+    """
+    获取远程 TXT 文件内容，并将其解析为 M3U 项目列表。
+
+    Args:
+        url: 远程 TXT 源文件的 URL。
+
+    Returns:
+        包含解析后项目（字典）的列表。
+        每个字典格式为: {'name': str, 'url': str, 'group': str}
+    """
+    print(f"-> Fetching content from: {url}")
+    
+    # 确定 group-title
+    group_title = get_filename_from_url(url)
+    
+    try:
+        # 使用 requests 获取文件内容，设置超时
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # 检查 HTTP 状态码，如果不是 200 则抛出异常
+        
+        # 假设内容是 UTF-8 编码
+        content = response.text
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching URL: {e}", file=sys.stderr)
+        return []
+
+    parsed_items = []
+    lines = content.split('\n')
+    
+    for line in lines:
+        trimmed_line = line.strip()
+        if not trimmed_line:
+            continue
+        
+        # 期望格式: 频道名,链接 (链接可能包含逗号)
+        parts = trimmed_line.split(',', 1) # 只分割第一个逗号
+        
+        if len(parts) == 2:
+            name = parts[0].strip()
+            link = parts[1].strip()
+            
+            # 简单验证链接是否有效
+            if name and link:
+                parsed_items.append({
+                    'name': name,
+                    'url': link,
+                    'group': group_title  # 使用文件名作为 group-title
+                })
+            else:
+                print(f"Warning: Skipping malformed line (Invalid name or URL): {trimmed_line}")
+        else:
+            print(f"Warning: Skipping malformed line (Missing comma separator): {trimmed_line}")
+            
+    print(f"-> Successfully parsed {len(parsed_items)} items with group-title: '{group_title}'")
+    return parsed_items
+
+def generate_m3u(items: list) -> str:
+    """
+    将项目列表转换为 M3U 格式的字符串。
+
+    Args:
+        items: 包含 M3U 频道信息的字典列表。
+
+    Returns:
+        完整的 M3U 格式内容字符串。
+    """
+    m3u_content = "#EXTM3U\n"
+    for item in items:
+        # 确保名称和分组标题中不包含未转义的双引号
+        safe_name = item['name'].replace('"', "'")
+        safe_group = item['group'].replace('"', "'")
+
+        # M3U 格式：#EXTINF:-1 group-title="<分组名>",<频道名>
+        m3u_content += f'#EXTINF:-1 group-title="{safe_group}",{safe_name}\n'
+        m3u_content += f'{item["url"]}\n'
+        
+    return m3u_content
+
+# --- FFmpeg 可用性检查 ---
+def check_ffmpeg_availability():
+    """检查系统 PATH 中是否可以找到 FFmpeg，如果找不到则终止程序。"""
+    print("\n" + "="*50)
+    print("--- 步骤 0: FFmpeg 依赖检查 ---")
+    try:
+        # 尝试运行 ffmpeg，只输出版本信息，检查是否可用
+        subprocess.run([FFMPEG_BINARY, "-version"], check=True, capture_output=True, text=True, timeout=5)
+        print(f"✅ FFmpeg 检查通过。使用二进制文件: {FFMPEG_BINARY}")
+        print("="*50)
+    except FileNotFoundError:
+        print(f"❌ 错误: 未在系统 PATH 中找到 '{FFMPEG_BINARY}'。")
+        print("请确保您已安装 FFmpeg 并将其路径添加到系统环境变量中。")
+        print("程序终止。")
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"❌ 错误: FFmpeg 启动失败或返回错误代码。请检查安装。错误信息: {e.stderr.strip()}")
+        print("程序终止。")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        print(f"⚠️ 警告: FFmpeg 检查超时，但假定可用。请注意性能。")
+        print("="*50)
+    except Exception as e:
+        print(f"❌ 错误: FFmpeg 检查过程中发生未知错误: {e}")
+        print("程序终止。")
+        sys.exit(1)
+
+
+# --- GeoIP 和 M3U 解析工具函数 (保持不变) ---
 
 def extract_ip_from_url(url: str) -> str:
     """从完整的 URL 中提取 IP 地址或域名。"""
     try:
         parsed_url = urllib.parse.urlparse(url)
         hostname = parsed_url.hostname
-        # 简单的域名/IP提取，忽略端口等
         return hostname or ""
     except Exception:
         return ""
@@ -137,7 +271,7 @@ def get_geo_info_for_classification(ip_or_domain: str) -> str:
 
 def parse_m3u_blocks(content: str) -> List[Dict[str, str]]:
     """将 M3U 内容解析为 (EXTINF, URL, group-title) 频道块列表。"""
-    
+
     # 正则表达式匹配 #EXTINF:... 后面的 URL
     # group 1: 完整的 #EXTINF 行
     # group 2: 频道名称 (在 , 后面，换行符之前)
@@ -145,121 +279,218 @@ def parse_m3u_blocks(content: str) -> List[Dict[str, str]]:
     pattern = re.compile(r'(#EXTINF:.*?,\s*([^,\n]+))(?:\s*|[\n\r]+)(http[^#\s]+)', re.IGNORECASE)
     # 正则表达式用于提取 group-title
     group_title_pattern = re.compile(r'group-title="([^"]*)"', re.IGNORECASE)
-    
+
     blocks = []
     for match in pattern.finditer(content):
         extinf_line = match.group(1).strip()
         channel_name = match.group(2).strip()
         url = match.group(3).strip()
-        
+
         # 提取 group-title
         group_match = group_title_pattern.search(extinf_line)
-        # 默认设置为 Undefined，以便进行 GeoIP 分类
-        group_title = group_match.group(1) if group_match else 'Undefined' 
-        
+        group_title = group_match.group(1) if group_match else 'Undefined'
+
         blocks.append({
             'extinf': extinf_line,
             'url': url,
             'name': channel_name,
-            'group': group_title, 
-            'status': 'N/A' # 状态不再重要，因为跳过了检查
+            'group': group_title,
+            # 'status': 'N/A'
         })
-        
+
     if not blocks:
         print("❌ 警告：未在文件中找到任何有效的频道和 URL 组合。")
-        
+
     return blocks
 
-# --- 核心函数：M3U 文件操作 ---
+# --- 核心函数：流可用性检查 (并发) - 使用 FFmpeg ---
 
-def download_m3u(url: str, filename: str) -> str | None:
-    """从给定URL下载M3U文件并保存。"""
-    print(f"--- 正在下载文件: {url} ---")
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=TIMEOUT)
-        response.raise_for_status()
-        
-        content = response.content.decode('utf-8', errors='ignore')
-
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(content)
-        print(f"✅ 下载完成。文件已保存为 {filename}")
-        return content
-    except requests.exceptions.RequestException as e:
-        print(f"❌ 错误：下载文件失败。请检查URL和网络连接: {e}")
-        return None
-
-def save_merged_m3u(streams: List[Dict[str, str]], output_path: str):
+def worker_check_stream(stream: Dict[str, str], index: int, total_count: int) -> Dict[str, str] | None:
     """
-    【阶段 1 核心】保存所有解析和合并后的流到一个中间 M3U 文件。
-    用于用户进行外部可用性检查。
+    流可用性检查工作函数。使用 FFmpeg 快速检查流的可播放性。
+    FFmpeg 命令: ffmpeg -i <URL> -t 5 -f null -
     """
-    print(f"\n--- 阶段 1: 3. 保存合并后的 M3U 文件 ({output_path}) ---")
+    url = stream['url']
+    is_working = False
     
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write("#EXTM3U\n") # M3U 文件头
-            
-            for stream in streams:
-                # 写入 EXTINF 行，此时 group-title 已经被处理为英文国家名或 Undefined
-                f.write(stream['extinf'] + '\n') 
-                f.write(stream['url'] + '\n')
-                
-        print(f"🎉 阶段 1 完成。已将 {len(streams)} 个流保存到 {output_path}")
-        print("==================================================================")
-        print(f"👉 **下一步:** 请使用外部工具检查此文件中的流。")
-        print(f"👉 **完成后:** 删除无效流，并将文件重命名为 **{INPUT_CLEANED_FILE_NAME}**，然后重新运行脚本。")
-        print("==================================================================")
-        
-    except Exception as e:
-        print(f"❌ 写入中间文件时发生错误: {e}")
+    # FFmpeg 命令: 尝试读取输入流，持续 STREAM_CHECK_TIMEOUT 秒，输出到 null，只显示致命错误
+    # '-t' 限制 FFmpeg 仅读取前 N 秒的数据
+    command = [
+        FFMPEG_BINARY, 
+        '-hide_banner', # 隐藏 FFmpeg 版本信息
+        '-v', 'error',  # 只输出错误信息
+        '-i', url, 
+        '-t', str(STREAM_CHECK_TIMEOUT), 
+        '-f', 'null', 
+        '-'
+    ]
+    
+    # 打印进度 (使用 print_lock)
+    with print_lock:
+        progress_percent = ((index + 1) / total_count) * 100
+        # 初始状态显示 'Checking'
+        print(f"检查进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
+              f"[🚧 Checking] 频道: {stream['name'][:30]:<30}", end="\r")
 
+    try:
+        # 执行 FFmpeg 命令
+        # check=False: 即使 FFmpeg 内部因流中断而退出（非致命错误），Python 也不抛出异常
+        result = subprocess.run(
+            command, 
+            timeout=STREAM_CHECK_TIMEOUT + 2, # 给 subprocess 额外 2 秒时间来清理 FFmpeg 进程
+            capture_output=True, 
+            check=False,
+            text=True
+        )
+        
+        # FFmpeg 成功读取流并退出时通常返回 0 或 1 
+        # (对于 HLS/dash 流，读取到 EOF 或达到 '-t' 限制可能会返回 1)
+        # 任何其他非致命错误，只要能成功连接并解析流，都算作可用 (return code 0 或 1)
+        if result.returncode in [0, 1]:
+            is_working = True
+        else:
+            # 如果 FFmpeg 退出码不是 0 或 1，通常表示连接失败或流格式严重错误
+            # 可以在此处捕获详细错误，但为了简洁，我们只判断可用性
+            is_working = False
+
+    except subprocess.TimeoutExpired:
+        # 超时被捕获为不可用
+        is_working = False
+    except Exception as e:
+        # 其他异常 (如权限问题)
+        is_working = False
+        #  with print_lock:
+        #     print(f"\n❌ 警告：频道 {stream['name']} 检查发生异常: {e}", file=sys.stderr)
+
+    # 再次打印进度，更新状态
+    with print_lock:
+        progress_percent = ((index + 1) / total_count) * 100
+        status = "✅ OK" if is_working else "❌ BAD"
+        print(f"检查进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
+              f"[{status}] 频道: {stream['name'][:30]:<30}", end="\r")
+
+    return stream if is_working else None
+
+def check_stream_availability_concurrent(streams: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """
+    使用多线程并发检查流的可用性。
+    """
+    total_count = len(streams)
+    print(f"\n--- 步骤 2: 流可用性检查 ({total_count}个流) ---")
+    print(f"🚀 使用 {STREAM_CHECK_WORKERS} 个线程并发检查 (超时: {STREAM_CHECK_TIMEOUT}s，使用 FFmpeg)。")
+    
+    futures = []
+    working_streams = []
+    
+    with ThreadPoolExecutor(max_workers=STREAM_CHECK_WORKERS) as executor:
+        for i, stream in enumerate(streams):
+            future = executor.submit(
+                worker_check_stream,
+                stream,
+                i,
+                total_count
+            )
+            futures.append(future)
+            # 线程启动间添加延迟 (可调)
+            # time.sleep(0.001) 
+
+        # 收集结果
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                working_streams.append(result)
+
+    print("\n" + " " * 80, end="\r") # 清除进度行
+    print(f"✅ 流检查完成。原始数量: {total_count}，可用数量: {len(working_streams)}。")
+    return working_streams
+
+# --- 核心函数：数据处理 (保持不变) ---
+
+def download_and_merge_sources(china_sources: List[Tuple[str, str]]) -> List[Dict[str, str]]:
+    """
+    下载主 M3U
+    """
+    all_streams = []
+
+    print("\n" + "="*50)
+    print("--- 步骤 1: 下载和合并 M3U 源 ---")
+
+    # 2. 处理中国专用源
+    print(f"\n 正在处理 {len(china_sources)} 个源...")
+
+    for m3u_url, file_type in china_sources:
+        try:
+            if file_type == "m3u":
+                response = requests.get(m3u_url, timeout=TIMEOUT)
+                response.raise_for_status()
+                content = response.content.decode('utf-8', errors='ignore')
+                main_streams = parse_m3u_blocks(content)
+            elif file_type == "txt":
+                m3u_items = fetch_and_parse_txt(m3u_url)
+                if not m3u_items:
+                    print("\nCould not parse any valid items. Exiting.")
+                    continue
+                final_m3u_content = generate_m3u(m3u_items)
+                main_streams = parse_m3u_blocks(final_m3u_content)
+
+            all_streams.extend(main_streams)
+            
+            print(f"  - ✅ 源 {m3u_url} 合并成功。新增流数量: {len(main_streams)}")
+
+        except RequestException as e:
+            print(f"  - ❌ 源 {m3u_url} 下载或解析失败，跳过: {e}")
+
+    print(f"\n✅ 所有源合并完成。最终总流数量: {len(all_streams)}")
+    print("="*50)
+    return all_streams
 
 def classify_undefined_streams(streams: List[Dict[str, str]], country_map: Dict[str, str]) -> List[Dict[str, str]]:
     """
-    【阶段 2 - 步骤 1/3】针对 group-title="Undefined" 的流，进行 IP 地理位置查询和分类。
+    针对 group-title="Undefined" 的流，进行 IP 地理位置查询和分类。
     """
-    
     streams_to_classify = [s for s in streams if s['group'] == 'Undefined']
     total_to_classify = len(streams_to_classify)
-    
+
+    print(f"\n--- 步骤 3: IP 地理位置分类 (GeoIP) ---")
+
     if not total_to_classify:
-        print("\n--- 阶段 2: 1. IP 地理位置分类 (GeoIP) ---")
-        print("✅ 无需分类：清理文件中没有 group-title=\"Undefined\" 的频道。跳过 GeoIP 查询。")
+        print("✅ 无需分类：没有 group-title=\"Undefined\" 的频道。跳过 GeoIP 查询。")
         return streams
 
-    print(f"\n--- 阶段 2: 1. IP 地理位置分类 (GeoIP) ---")
     print(f"找到 {total_to_classify} 个 'Undefined' 频道需要 GeoIP 查找。")
     print(f"⚠️ 注意: 启用速率限制 ({IP_RATE_LIMIT_DELAY} 秒延迟)。此步骤是串行执行。")
-    
+
     country_map_keys = set(country_map.keys())
-    
-    # 遍历所有流，但只处理 Undefined 的流
+
+    # 遍历所有流，只处理 Undefined 的流
     for i, stream in enumerate(streams):
         if stream['group'] != 'Undefined':
             continue
-        
+
         ip_or_domain = extract_ip_from_url(stream['url'])
-        
-        # 打印进度 (只针对 Undefined 频道)
+
+        # 打印进度
         print(f"[GeoIP Progress] 查找频道: {stream['name'][:30]:<30} | 源: {ip_or_domain}", end="")
 
         api_country_name = get_geo_info_for_classification(ip_or_domain)
 
         # 1. 映射到英文分组名
         if api_country_name in country_map_keys:
-            new_group_title_english = api_country_name 
-            
+            new_group_title_english = api_country_name
+
             # 替换 EXTINF 中的 group-title
-            old_tag = 'group-title="Undefined"'
+            # 使用正则表达式来匹配并替换 group-title="Undefined" 或不存在 group-title 的情况
+            group_title_pattern = re.compile(r'group-title="[^"]*"')
             new_tag = f'group-title="{new_group_title_english}"'
             
-            stream['extinf'] = stream['extinf'].replace(old_tag, new_tag)
+            if group_title_pattern.search(stream['extinf']):
+                 stream['extinf'] = group_title_pattern.sub(new_tag, stream['extinf'])
+            else:
+                 # 如果没有 group-title 属性，则尝试在 #EXTINF:-1 后添加
+                 stream['extinf'] = stream['extinf'].replace('#EXTINF:-1', f'#EXTINF:-1 {new_tag}', 1)
+
             stream['group'] = new_group_title_english # 更新 internal record
-            
+
             print(f" -> 匹配成功: {api_country_name} (更新为英文分组名)")
         else:
             # 2. 如果查找失败或不在映射表中，保持 Undefined
@@ -267,24 +498,23 @@ def classify_undefined_streams(streams: List[Dict[str, str]], country_map: Dict[
                 print(f" -> 保持 Undefined: 查找失败或无法识别 ({api_country_name})")
             else:
                 print(f" -> 保持 Undefined: 查找到 {api_country_name}，但不在 COUNTRY_MAPPING 中")
-        
-        # 强制延迟，确保遵守 ip-api.com 的速率限制
-        time.sleep(IP_RATE_LIMIT_DELAY) 
-        
-    return streams 
 
-# --- 核心函数：名称翻译（并发） ---
+        # 强制延迟，确保遵守 ip-api.com 的速率限制
+        time.sleep(IP_RATE_LIMIT_DELAY)
+
+    return streams
 
 def worker_translate(name: str, index: int, total_count: int, target_lang: str, source_lang: str) -> Tuple[str, str]:
     """单个频道名称的翻译工作函数。"""
     try:
-        translator = GoogleTranslator(source=source_lang, target=target_lang)
+        # 使用 GoogleTranslator 的单例/实例，线程安全
+        translator = GoogleTranslator(source=source_lang, target=target_lang) 
         translated_text = translator.translate(name)
         
         with print_lock:
             progress_percent = ((index + 1) / total_count) * 100
             print(f"翻译进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
-                  f"原始: {name[:30]:<30} -> 翻译: {translated_text[:30]:<30}")
+                  f"原始: {name[:20]:<20} -> 翻译: {translated_text[:20]:<20}", end="\r")
             
         return (name, translated_text)
     except Exception as e:
@@ -294,12 +524,12 @@ def worker_translate(name: str, index: int, total_count: int, target_lang: str, 
 
 def translate_channels_concurrent(unique_names: List[str]) -> Dict[str, str]:
     """
-    【阶段 2 - 步骤 2/3】使用多线程加速翻译频道名称。
+    使用多线程加速翻译频道名称。
     """
     channel_map = {}
     total_count = len(unique_names)
-    
-    print(f"\n--- 阶段 2: 2. 自动翻译频道名称 (TURBO模式 - {total_count}个) ---")
+
+    print(f"\n--- 步骤 4: 自动翻译频道名称 (TURBO模式 - {total_count}个) ---")
     print(f"🚀 使用 {MAX_WORKERS} 个线程并发翻译。")
 
     futures = []
@@ -321,30 +551,29 @@ def translate_channels_concurrent(unique_names: List[str]) -> Dict[str, str]:
         for future in as_completed(futures):
             original, translated = future.result()
             channel_map[original] = translated
-    
-    print(f"\n✅ 频道翻译完成。已成功翻译 {len(channel_map)} 个名称。")
-    return channel_map
 
-# --- 核心函数：构建和保存文件 ---
+    print("\n" + " " * 80, end="\r") # 清除进度行
+    print(f"✅ 频道翻译完成。已成功翻译 {len(channel_map)} 个名称。")
+    return channel_map
 
 def build_and_save_final_m3u8(final_streams: List[Dict[str, str]], country_map: Dict[str, str], channel_map: Dict[str, str], output_path: str):
     """
-    【阶段 2 - 步骤 3/3】执行替换（英文分组名 -> 中文分组名）和文件写入操作。
+    执行替换（英文分组名 -> 中文分组名，英文频道名 -> 中文频道名）和文件写入操作。
     """
-    print(f"\n--- 阶段 2: 3. 构建和保存最终 M3U8 文件 ---")
-    
+    print(f"\n--- 步骤 5: 构建和保存最终 M3U8 文件 ---")
+
     country_replace_count = 0
     channel_replace_count = 0
-    
+
     # 1. 替换 group-title="..." 的函数 (将英文国家名替换为中文名)
-    def replace_country_name(match):
+    def replace_country_name_func(match):
         nonlocal country_replace_count
         english_name = match.group(2)
         chinese_name = country_map.get(english_name, english_name)
         if chinese_name != english_name:
             country_replace_count += 1
         return f'{match.group(1)}{chinese_name}{match.group(3)}'
-    
+
     # 正则表达式用于替换 group-title="..."
     country_pattern = re.compile(r'(group-title=")([^"]+)(")')
 
@@ -355,166 +584,77 @@ def build_and_save_final_m3u8(final_streams: List[Dict[str, str]], country_map: 
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write("#EXTM3U\n") # M3U 文件头
-            
+
             for stream in final_streams:
                 original_extinf = stream['extinf']
                 original_name = stream['name']
                 url = stream['url']
-                
+
                 # 1. 替换国家/地区分组名称 (group-title)
-                translated_extinf_group = country_pattern.sub(replace_country_name, original_extinf)
-                
+                translated_extinf_group = country_pattern.sub(replace_country_name_func, original_extinf)
+
                 # 2. 替换频道名称
                 translated_name = channel_map.get(original_name, original_name)
-                
+
                 # 替换 EXTINF 行末尾的频道名称
                 final_extinf = name_end_pattern.sub(f', {translated_name}', translated_extinf_group)
-                
+
                 if translated_name != original_name:
                     channel_replace_count += 1
-                
+
                 f.write(final_extinf + '\n')
                 f.write(url + '\n')
-                
+
         print(f"  替换统计:")
         print(f"  - 国家/地区分组替换数量: {country_replace_count}")
         print(f"  - 频道名称替换数量: {channel_replace_count}")
         print(f"✅ 文件构建完成。新文件已保存到：{output_path}")
-        
+
     except Exception as e:
         print(f"❌ 写入文件时发生错误: {e}")
-
-# --- 阶段 1 入口：下载和合并 ---
-
-def run_phase_1_merge():
-    """运行下载、合并和输出中间文件的第一阶段。"""
-    
-    # 1. 下载第一个文件 (主文件)
-    print("\n" + "="*50)
-    print("--- 阶段 1: 1. 下载主 M3U 文件 ---")
-    m3u_content_1 = download_m3u(M3U_URL, INPUT_FILE_NAME)
-    if not m3u_content_1: 
-        print("❌ 主文件下载失败，终止程序。")
-        return
-    
-    # 2. 解析成块
-    all_streams = parse_m3u_blocks(m3u_content_1)
-    initial_stream_count = len(all_streams)
-
-    # 2.1 处理多个中国专用源
-    print("\n" + "="*50)
-    print(f"--- 阶段 1: 2. 处理 {len(CHINA_M3U_SOURCES)} 个中国专用源 ---")
-    
-    china_country_english = "China" 
-    
-    group_title_pattern = re.compile(r'\sgroup-title="[^"]*"', re.IGNORECASE)
-    new_group_tag = f' group-title="{china_country_english}"'
-
-    total_merged_count = 0
-
-    for m3u_url, temp_filename in CHINA_M3U_SOURCES:
-        print(f"\n>>>> 正在处理中国源: {m3u_url}")
-        m3u_content_china = download_m3u(m3u_url, temp_filename)
-        
-        if m3u_content_china:
-            china_streams = parse_m3u_blocks(m3u_content_china)
-            china_streams_count = len(china_streams)
-            total_merged_count += china_streams_count
-            
-            for stream in china_streams:
-                if group_title_pattern.search(stream['extinf']):
-                    stream['extinf'] = group_title_pattern.sub(new_group_tag, stream['extinf'])
-                else:
-                    stream['extinf'] = stream['extinf'].replace('#EXTINF:-1', f'#EXTINF:-1{new_group_tag}', 1)
-                
-                stream['group'] = china_country_english
-                all_streams.append(stream)
-            
-        else:
-            print(f"❌ 中国源下载失败，跳过合并: {m3u_url}")
-
-    print(f"\n✅ 所有源合并完成。初始流数量: {initial_stream_count}, 总合并流数量: {total_merged_count}。最终总流数量: {len(all_streams)}")
-    print("="*50)
-    
-    # 3. 保存合并后的 M3U 文件供用户外部检查
-    save_merged_m3u(all_streams, INTERMEDIATE_FILE_NAME)
-
-
-# --- 阶段 2 入口：处理清理后的文件 ---
-
-def run_phase_2_process(cleaned_file_path: str):
-    """运行导入清理后的文件、GeoIP、翻译和最终输出的第二阶段。"""
-    
-    print("\n" + "="*50)
-    print(f"--- 阶段 2: 正在导入清理文件 {cleaned_file_path} ---")
-    
-    try:
-        with open(cleaned_file_path, 'r', encoding='utf-8') as f:
-            cleaned_content = f.read()
-        
-        # 1. 解析清理后的文件
-        streams_from_cleaned = parse_m3u_blocks(cleaned_content)
-        print(f"✅ 成功导入 {len(streams_from_cleaned)} 个流。")
-
-    except FileNotFoundError:
-        print(f"❌ 错误：文件 {cleaned_file_path} 不存在。请确保您已完成清理并重命名文件。")
-        return
-    except Exception as e:
-        print(f"❌ 导入或解析文件 {cleaned_file_path} 失败: {e}")
-        return
-
-    # 2. IP 地理位置分类 (仅针对 Undefined)
-    final_classified_streams = classify_undefined_streams(streams_from_cleaned, COUNTRY_MAPPING)
-
-    # 3. 提取唯一名称并翻译
-    unique_channels = sorted(list(set(s['name'] for s in final_classified_streams)))
-    channel_translation_map = translate_channels_concurrent(unique_channels)
-
-    # 4. 构建并保存最终文件
-    build_and_save_final_m3u8(final_classified_streams, COUNTRY_MAPPING, channel_translation_map, OUTPUT_FILE_NAME)
-
-    print("\n" + "="*50)
-    print("--- 阶段 2: 任务总结 ---")
-    print(f"导入流数量: {len(streams_from_cleaned)}")
-    print(f"🎉 **所有任务完成！最终文件（已清理并翻译）: {OUTPUT_FILE_NAME}**")
-    print("="*50)
-
 
 # --- 主程序入口 ---
 def main():
     start_time = time.time()
-    
-    # 关闭 requests 库发出的不必要的 InsecureRequestWarning
-    requests.packages.urllib3.disable_warnings() 
-    
-    # 清理临时文件
-    def cleanup_temps():
-        print("\n--- 清理临时文件 ---")
-        temp_files = [INPUT_FILE_NAME, INTERMEDIATE_FILE_NAME] + [f for _, f in CHINA_M3U_SOURCES]
-        
-        # 移除所有临时文件，但不包括 INPUT_CLEANED_FILE_NAME，因为它在第二阶段是输入文件
-        for temp_filename in temp_files:
-            if os.path.exists(temp_filename):
-                os.remove(temp_filename) 
-                print(f"  已删除临时文件: {temp_filename}")
-    
-    # 检查是否存在清理后的文件，以确定运行哪个阶段
-    if os.path.exists(INPUT_CLEANED_FILE_NAME):
-        # --- 运行阶段 2 ---
-        cleanup_temps()
-        run_phase_2_process(INPUT_CLEANED_FILE_NAME)
-        # 删除阶段 2 的输入文件，以便下次运行新周期
-        if os.path.exists(INPUT_CLEANED_FILE_NAME):
-            os.remove(INPUT_CLEANED_FILE_NAME)
-            print(f"  已删除阶段 2 输入文件: {INPUT_CLEANED_FILE_NAME}")
 
-    else:
-        # --- 运行阶段 1 ---
-        cleanup_temps() # 清理残留的旧临时文件，包括旧的 merged 文件
-        run_phase_1_merge()
+    # 关闭 requests 库发出的不必要的 InsecureRequestWarning
+    requests.packages.urllib3.disable_warnings()
+
+    # 步骤 0: 检查 FFmpeg 可用性
+    check_ffmpeg_availability()
+    
+    # 步骤 1: 下载和合并所有源
+    all_streams = download_and_merge_sources(M3U_SOURCES)
+    
+    if not all_streams:
+        print("程序终止：未能从任何源获取到流数据。")
+        return
+
+    # 步骤 2: 流可用性检查 (清理无效流) - 使用 FFmpeg
+    working_streams = check_stream_availability_concurrent(all_streams)
+
+    if not working_streams:
+        print("程序终止：所有流均不可用或检查失败。")
+        return
+
+    # 步骤 3: IP 地理位置分类 (仅针对 group="Undefined")
+    # 此步骤仍使用 requests 库访问 GeoIP API
+    classified_streams = classify_undefined_streams(working_streams, COUNTRY_MAPPING)
+
+    # 步骤 4: 提取唯一名称并翻译 (并发)
+    # 此步骤仍使用 deep_translator 库
+    unique_channels = sorted(list(set(s['name'] for s in classified_streams)))
+    channel_translation_map = translate_channels_concurrent(unique_channels)
+
+    # 步骤 5: 构建和保存最终文件
+    build_and_save_final_m3u8(classified_streams, COUNTRY_MAPPING, channel_translation_map, OUTPUT_FILE_NAME)
 
     end_time = time.time()
-    print(f"\n**总耗时: {end_time - start_time:.2f} 秒**")
+    print("\n" + "="*50)
+    print("--- 任务总结 ---")
+    print(f"🎉 **所有任务完成！最终文件（已清理、分类并翻译）: {OUTPUT_FILE_NAME}**")
+    print(f"总耗时: {end_time - start_time:.2f} 秒")
+    print("="*50)
 
 if __name__ == "__main__":
     main()
