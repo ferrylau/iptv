@@ -12,7 +12,7 @@ from requests.exceptions import RequestException
 import sys # 新增：用于错误输出
 
 # OUTPUT_FILE_NAME = "global_tv.m3u" # 最终输出文件
-OUTPUT_FILE_NAME = "china_extra_tv.m3u" # 最终输出文件
+OUTPUT_FILE_NAME = "china_tv.m3u" # 最终输出文件
 # 中国 M3U 源列表配置 (元组: (URL, 文件类型))
 M3U_SOURCES: List[Tuple[str, str]] = [
     # 全球源
@@ -21,15 +21,19 @@ M3U_SOURCES: List[Tuple[str, str]] = [
     #("https://raw.githubusercontent.com/wcb1969/iptv/refs/heads/main/%E7%94%B5%E4%BF%A1IPTV.txt", "txt"),
 
     # china & hk & tw & other
-    ('https://epg.pw/test_channels.m3u','m3u'),
-    ('https://epg.pw/test_channels_hong_kong.m3u','m3u'),
-    ('https://epg.pw/test_channels_macau.m3u','m3u'),
+    # ('https://epg.pw/test_channels.m3u','m3u'),
+    # ('https://epg.pw/test_channels_hong_kong.m3u','m3u'),
+    # ('https://epg.pw/test_channels_macau.m3u','m3u'),
 
-    ('https://epg.pw/test_channels_taiwan.m3u','m3u'),
-    ('https://iptv-org.github.io/iptv/countries/tw.m3u','m3u'),
+    # ('https://epg.pw/test_channels_taiwan.m3u','m3u'),
+    # ('https://iptv-org.github.io/iptv/countries/tw.m3u','m3u'),
 
-    ('https://epg.pw/test_channels_singapore.m3u','m3u'),
-    ('https://epg.pw/test_channels_malaysia.m3u','m3u'),
+    # ('https://epg.pw/test_channels_singapore.m3u','m3u'),
+    # ('https://epg.pw/test_channels_malaysia.m3u','m3u'),
+
+    # only china
+    ('https://raw.githubusercontent.com/zbefine/iptv/main/iptv.m3u','m3u'),
+    ('https://raw.githubusercontent.com/vamoschuck/TV/main/M3U','m3u'),
 ]
 
 SOURCE_LANG = 'en'
