@@ -3,18 +3,42 @@ import re
 import urllib.parse
 import time
 import os
+import asyncio
 import subprocess # 新增：用于执行 FFmpeg 命令行工具
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Optional, Tuple
 from deep_translator import GoogleTranslator
 from requests.exceptions import RequestException
 import sys # 新增：用于错误输出
 
+
+M3U_SOURCES_CHINA: List[Tuple[str, str]] = [
+    ('https://raw.githubusercontent.com/zbefine/iptv/main/iptv.m3u','m3u'),
+    ('https://raw.githubusercontent.com/vamoschuck/TV/main/M3U','m3u'),
+]
+
+M3U_SOURCES_CHINA_EXTRA: List[Tuple[str, str]] = [
+    ('https://epg.pw/test_channels.m3u','m3u'),
+    ('https://epg.pw/test_channels_hong_kong.m3u','m3u'),
+    ('https://epg.pw/test_channels_macau.m3u','m3u'),
+
+    ('https://epg.pw/test_channels_taiwan.m3u','m3u'),
+    ('https://iptv-org.github.io/iptv/countries/tw.m3u','m3u'),
+
+    ('https://epg.pw/test_channels_singapore.m3u','m3u'),
+    ('https://epg.pw/test_channels_malaysia.m3u','m3u'),
+]
+
+M3U_SOURCES_GLOBAL: List[Tuple[str, str]] = [
+    ("https://iptv-org.github.io/iptv/index.country.m3u","m3u"),
+    #("https://raw.githubusercontent.com/wcb1969/iptv/refs/heads/main/%E7%94%B5%E4%BF%A1IPTV.txt", "txt"),
+]
+
 # OUTPUT_FILE_NAME = "global_tv.m3u" # 最终输出文件
-OUTPUT_FILE_NAME = "china_tv.m3u" # 最终输出文件
+# OUTPUT_FILE_NAME = "china_tv.m3u" # 最终输出文件
 # 中国 M3U 源列表配置 (元组: (URL, 文件类型))
-M3U_SOURCES: List[Tuple[str, str]] = [
+# M3U_SOURCES: List[Tuple[str, str]] = [
     # 全球源
     # ("https://iptv-org.github.io/iptv/index.country.m3u","m3u"),
 
@@ -32,8 +56,14 @@ M3U_SOURCES: List[Tuple[str, str]] = [
     # ('https://epg.pw/test_channels_malaysia.m3u','m3u'),
 
     # only china
-    ('https://raw.githubusercontent.com/zbefine/iptv/main/iptv.m3u','m3u'),
-    ('https://raw.githubusercontent.com/vamoschuck/TV/main/M3U','m3u'),
+#     ('https://raw.githubusercontent.com/zbefine/iptv/main/iptv.m3u','m3u'),
+#     ('https://raw.githubusercontent.com/vamoschuck/TV/main/M3U','m3u'),
+# ]
+
+SOURCE_ALL: List[Tuple[List[Tuple[str, str]],str]] = [
+    (M3U_SOURCES_CHINA, "china_tv.m3u"),
+    (M3U_SOURCES_CHINA_EXTRA, "china_extra_tv.m3u"),
+    (M3U_SOURCES_GLOBAL, "global_tv.m3u"),
 ]
 
 SOURCE_LANG = 'en'
@@ -49,7 +79,7 @@ MAX_WORKERS = 30      # 并发线程数：用于翻译
 TIMEOUT = 5          # 默认请求超时时间（秒）
 
 # 新增：流可用性检查配置
-STREAM_CHECK_WORKERS = 30 # 并发线程数：用于流检查
+STREAM_CHECK_WORKERS = 20 # 并发线程数：用于流检查
 STREAM_CHECK_TIMEOUT = 5  # 检查超时时间（秒），用于快速判断连接
 FFMPEG_BINARY = "ffmpeg"  # FFmpeg 可执行文件名称 (通常在系统 PATH 中)
 
@@ -364,25 +394,37 @@ def parse_m3u_blocks(content: str) -> List[Dict[str, str]]:
 
 # --- 核心函数：流可用性检查 (并发) - 使用 FFmpeg ---
 
-def worker_check_stream(stream: Dict[str, str], index: int, total_count: int) -> Dict[str, str] | None:
+async def print_progress(index: int, total_count: int, stream_name: str, status: str):
+    """原子性地打印和更新进度条"""
+    if not GLOBAL_PRINT_LOCK:
+        return # 如果锁未初始化，跳过打印
+
+    async with GLOBAL_PRINT_LOCK:
+        progress_percent = ((index + 1) / total_count) * 100
+        # 使用 \r 实现单行更新
+        print(f"检查进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
+              f"[{status}] 频道: {stream_name[:30]:<30}", end="\r", flush=True)
+
+async def async_worker_check_stream(
+    stream: Dict[str, str], 
+    index: int, 
+    total_count: int,
+    semaphore: asyncio.Semaphore # 新增参数：信号量
+) -> Optional[Dict[str, str]]:
     """
-    流可用性检查工作函数。使用 FFmpeg 快速检查流的可播放性。
-    FFmpeg 命令: ffmpeg -i <URL> -t 5 -f null -
+    流可用性检查协程。使用 FFmpeg 异步检查流的可播放性，并受信号量限制并发数。
     """
     url = stream['url']
     is_working = False
     
-    # --- 关键优化：增强 FFmpeg 的网络连接健壮性 ---
-    # 1. '-reconnect 1': 启用自动重连（重要）
-    # 2. '-reconnect_streamed 1': 强制重连流数据
-    # 3. '-reconnect_delay_max 5': 设定最大重连延迟（防止无限阻塞）
-    # 4. '-analyzeduration 1000000': 限制流分析的时间为 1MB (默认可能太长)
-    # 5. '-probesize 1000000': 限制探测大小为 1MB (默认可能太长)
-    
+    # 整个进程运行的最大时间: STREAM_CHECK_TIMEOUT (读取时间) + 5秒 (网络握手/重连缓冲)
+    process_timeout = STREAM_CHECK_TIMEOUT + 5 
+
+    # --- FFmpeg 命令设置 ---
     command = [
         FFMPEG_BINARY, 
-        '-hide_banner', # 隐藏 FFmpeg 版本信息
-        '-v', 'error',  # 只输出错误信息
+        '-hide_banner', 
+        '-v', 'error', 
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',
@@ -394,86 +436,101 @@ def worker_check_stream(stream: Dict[str, str], index: int, total_count: int) ->
         '-'
     ]
     
-    # 打印进度 (使用 print_lock)
-    with print_lock:
-        progress_percent = ((index + 1) / total_count) * 100
-        # 初始状态显示 'Checking'
-        print(f"检查进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
-              f"[🚧 Checking] 频道: {stream['name'][:30]:<30}", end="\r")
+    # 初始状态显示 'Checking'
+    await print_progress(index, total_count, stream['name'], "🚧 Checking")
 
-    try:
-        # 执行 FFmpeg 命令
-        # check=False: 允许 FFmpeg 内部因流中断而退出而不抛出 Python 异常
-        # timeout: 整个进程运行的最大时间。STREAM_CHECK_TIMEOUT (读取时间) + 5秒 (网络握手/重连缓冲)
-        process_timeout = STREAM_CHECK_TIMEOUT + 5
-        result = subprocess.run(
-            command, 
-            timeout=process_timeout, # 假设您采用了上一轮回复中的 process_timeout
-            capture_output=True, 
-            check=False,
-            text=True,
-            encoding='utf-8', # <-- 🚀 明确指定 UTF-8 编码
-        )
-        
-        # --- 优化后的判断逻辑 ---
-        # 即使 FFmpeg 报告了一些错误 (stderr 不为空)，只要它能读取到数据并正常退出 (0 或 1)，
-        # 我们就认为它是可用的，因为大多数不稳定的流都会在 stderr 中留下警告或非致命错误。
-        if result.returncode in [0, 1]:
-            is_working = True
-        else:
-            # 如果 FFmpeg 退出码不是 0 或 1，通常表示连接失败或流格式严重错误
-            # 可以在此处捕获详细错误，但为了简洁，我们只判断可用性
+    proc = None
+    
+    # --- 核心修改：使用信号量限制并发执行 ---
+    async with semaphore:
+        try:
+            # 1. 异步创建子进程
+            # create_subprocess_exec 是异步 I/O 的推荐方式
+            proc = await asyncio.create_subprocess_exec(
+                *command, 
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            # 2. 异步等待命令完成，并设置超时保护
+            # asyncio.wait_for 会在超时时抛出 TimeoutError，并自动尝试取消 proc.communicate()
+            await asyncio.wait_for(proc.communicate(), timeout=process_timeout)
+            
+            # 如果执行到这里，表示进程已退出，且未超时
+            return_code = proc.returncode
+
+            # FFmpeg 退出码 0 或 1 通常表示成功读取数据，1 可能包含非致命警告
+            if return_code in [0, 1]:
+                is_working = True
+            else:
+                is_working = False
+
+        except asyncio.TimeoutError:
+            # 捕获超时，确保清理子进程
             is_working = False
+            if proc and proc.returncode is None:
+                # 进程仍在运行，尝试终止它
+                try:
+                    # 尝试优雅终止 (SIGTERM)
+                    proc.terminate()
+                    # 再次等待进程结束，但设置一个很短的清理时间
+                    await asyncio.wait_for(proc.wait(), timeout=1)
+                except (ProcessLookupError, asyncio.TimeoutError):
+                    # 如果失败，强制杀死 (SIGKILL)
+                    proc.kill()
+                
+        except FileNotFoundError:
+            # 在信号量内部打印 FFmpeg 错误，否则会被其他任务覆盖
+            await print_progress(index, total_count, stream['name'], "❌ FFMPEG")
+            print(f"\n❌ 警告：未找到 '{FFMPEG_BINARY}' 命令。请确保 FFmpeg 已安装并配置到 PATH 中。", file=sys.stderr)
+            is_working = False
+            
+        except Exception as e:
+            is_working = False
+            # 如果需要，可以在这里打印详细错误信息
 
-    except subprocess.TimeoutExpired:
-        # 超时被捕获为不可用
-        is_working = False
-    except Exception as e:
-        # 其他异常 (如权限问题)
-        is_working = False
-        #  with print_lock:
-        #     print(f"\n❌ 警告：频道 {stream['name']} 检查发生异常: {e}", file=sys.stderr)
-
-    # 再次打印进度，更新状态
-    with print_lock:
-        progress_percent = ((index + 1) / total_count) * 100
-        status = "✅ OK" if is_working else "❌ BAD"
-        print(f"检查进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
-              f"[{status}] 频道: {stream['name'][:30]:<30}", end="\r")
+    # 最终状态更新 (在信号量释放后，但仍需确保原子性)
+    status = "✅ OK" if is_working else "❌ BAD"
+    await print_progress(index, total_count, stream['name'], status)
 
     return stream if is_working else None
 
-def check_stream_availability_concurrent(streams: List[Dict[str, str]]) -> List[Dict[str, str]]:
+async def async_check_stream_availability(streams: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
-    使用多线程并发检查流的可用性。
+    使用 asyncio 并发检查流的可用性，并使用 Semaphore 限制并发数。
     """
+    global GLOBAL_PRINT_LOCK
+    GLOBAL_PRINT_LOCK = asyncio.Lock() # 初始化全局打印锁
+
     total_count = len(streams)
+    
+    # --- 核心修改：创建信号量 ---
+    semaphore = asyncio.Semaphore(STREAM_CHECK_WORKERS)
+    
     print(f"\n--- 步骤 2: 流可用性检查 ({total_count}个流) ---")
-    print(f"🚀 使用 {STREAM_CHECK_WORKERS} 个线程并发检查 (超时: {STREAM_CHECK_TIMEOUT}s，使用 FFmpeg)。")
+    print(f"🚀 使用 {FFMPEG_BINARY} 和信号量限制 {STREAM_CHECK_WORKERS} 个并发任务 (超时: {STREAM_CHECK_TIMEOUT}s)。")
     
-    futures = []
-    working_streams = []
+    start_time = time.time()
     
-    with ThreadPoolExecutor(max_workers=STREAM_CHECK_WORKERS) as executor:
-        for i, stream in enumerate(streams):
-            future = executor.submit(
-                worker_check_stream,
-                stream,
-                i,
-                total_count
-            )
-            futures.append(future)
-            # 线程启动间添加延迟 (可调)
-            # time.sleep(0.001) 
+    tasks = []
+    # 创建所有任务
+    for i, stream in enumerate(streams):
+        # 使用 asyncio.create_task 并传递信号量
+        task = async_worker_check_stream(stream, i, total_count, semaphore)
+        tasks.append(task)
+    
+    # 使用 asyncio.gather 并发等待所有任务完成
+    results = await asyncio.gather(*tasks, return_exceptions=False)
+    
+    working_streams = [result for result in results if result is not None]
 
-        # 收集结果
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                working_streams.append(result)
-
-    print("\n" + " " * 80, end="\r") # 清除进度行
+    end_time = time.time()
+    
+    # 清除进度行并打印最终统计信息
+    print("\n" + " " * 80, end="\r") 
     print(f"✅ 流检查完成。原始数量: {total_count}，可用数量: {len(working_streams)}。")
+    print(f"总耗时: {end_time - start_time:.2f} 秒")
+    
     return working_streams
 
 # --- 核心函数：数据处理 (保持不变) ---
@@ -695,36 +752,38 @@ def main():
     # 步骤 0: 检查 FFmpeg 可用性
     check_ffmpeg_availability()
     
-    # 步骤 1: 下载和合并所有源
-    all_streams = download_and_merge_sources(M3U_SOURCES)
-    
-    if not all_streams:
-        print("程序终止：未能从任何源获取到流数据。")
-        return
+    for source, outfile in SOURCE_ALL:
+        # 步骤 1: 下载和合并所有源
+        all_streams = download_and_merge_sources(source)
+        
+        if not all_streams:
+            print("程序终止：未能从任何源获取到流数据。")
+            return
 
-    # 步骤 2: 流可用性检查 (清理无效流) - 使用 FFmpeg
-    working_streams = check_stream_availability_concurrent(all_streams)
+        # 步骤 2: 流可用性检查 (清理无效流) - 使用 FFmpeg
+        # working_streams = async_check_stream_availability(all_streams)
+        working_streams = asyncio.run(async_check_stream_availability(all_streams))
 
-    if not working_streams:
-        print("程序终止：所有流均不可用或检查失败。")
-        return
+        if not working_streams:
+            print("程序终止：所有流均不可用或检查失败。")
+            return
 
-    # 步骤 3: IP 地理位置分类 (仅针对 group="Undefined")
-    # 此步骤仍使用 requests 库访问 GeoIP API
-    classified_streams = classify_undefined_streams(working_streams, COUNTRY_MAPPING)
+        # 步骤 3: IP 地理位置分类 (仅针对 group="Undefined")
+        # 此步骤仍使用 requests 库访问 GeoIP API
+        classified_streams = classify_undefined_streams(working_streams, COUNTRY_MAPPING)
 
-    # 步骤 4: 提取唯一名称并翻译 (并发)
-    # 此步骤仍使用 deep_translator 库
-    unique_channels = sorted(list(set(s['name'] for s in classified_streams)))
-    channel_translation_map = translate_channels_concurrent(unique_channels)
+        # 步骤 4: 提取唯一名称并翻译 (并发)
+        # 此步骤仍使用 deep_translator 库
+        unique_channels = sorted(list(set(s['name'] for s in classified_streams)))
+        channel_translation_map = translate_channels_concurrent(unique_channels)
 
-    # 步骤 5: 构建和保存最终文件
-    build_and_save_final_m3u8(classified_streams, COUNTRY_MAPPING, channel_translation_map, OUTPUT_FILE_NAME)
+        # 步骤 5: 构建和保存最终文件
+        build_and_save_final_m3u8(classified_streams, COUNTRY_MAPPING, channel_translation_map, outfile)
+        
+        print("\n" + "="*50)        
+        print(f"🎉 **当前任务完成！最终文件（已清理、分类并翻译）: {outfile}**")
 
-    end_time = time.time()
-    print("\n" + "="*50)
-    print("--- 任务总结 ---")
-    print(f"🎉 **所有任务完成！最终文件（已清理、分类并翻译）: {OUTPUT_FILE_NAME}**")
+    end_time = time.time()        
     print(f"总耗时: {end_time - start_time:.2f} 秒")
     print("="*50)
 
