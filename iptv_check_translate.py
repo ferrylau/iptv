@@ -5,7 +5,6 @@ import time
 import os
 import asyncio
 import subprocess # 新增：用于执行 FFmpeg 命令行工具
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from typing import List, Dict, Optional, Tuple
 from deep_translator import GoogleTranslator
@@ -34,31 +33,6 @@ M3U_SOURCES_GLOBAL: List[Tuple[str, str]] = [
     ("https://iptv-org.github.io/iptv/index.country.m3u","m3u"),
     #("https://raw.githubusercontent.com/wcb1969/iptv/refs/heads/main/%E7%94%B5%E4%BF%A1IPTV.txt", "txt"),
 ]
-
-# OUTPUT_FILE_NAME = "global_tv.m3u" # 最终输出文件
-# OUTPUT_FILE_NAME = "china_tv.m3u" # 最终输出文件
-# 中国 M3U 源列表配置 (元组: (URL, 文件类型))
-# M3U_SOURCES: List[Tuple[str, str]] = [
-    # 全球源
-    # ("https://iptv-org.github.io/iptv/index.country.m3u","m3u"),
-
-    #("https://raw.githubusercontent.com/wcb1969/iptv/refs/heads/main/%E7%94%B5%E4%BF%A1IPTV.txt", "txt"),
-
-    # china & hk & tw & other
-    # ('https://epg.pw/test_channels.m3u','m3u'),
-    # ('https://epg.pw/test_channels_hong_kong.m3u','m3u'),
-    # ('https://epg.pw/test_channels_macau.m3u','m3u'),
-
-    # ('https://epg.pw/test_channels_taiwan.m3u','m3u'),
-    # ('https://iptv-org.github.io/iptv/countries/tw.m3u','m3u'),
-
-    # ('https://epg.pw/test_channels_singapore.m3u','m3u'),
-    # ('https://epg.pw/test_channels_malaysia.m3u','m3u'),
-
-    # only china
-#     ('https://raw.githubusercontent.com/zbefine/iptv/main/iptv.m3u','m3u'),
-#     ('https://raw.githubusercontent.com/vamoschuck/TV/main/M3U','m3u'),
-# ]
 
 SOURCE_ALL: List[Tuple[List[Tuple[str, str]],str]] = [
     (M3U_SOURCES_CHINA, "china_tv.m3u"),
@@ -633,53 +607,63 @@ def classify_undefined_streams(streams: List[Dict[str, str]], country_map: Dict[
 
     return streams
 
-def worker_translate(name: str, index: int, total_count: int, target_lang: str, source_lang: str) -> Tuple[str, str]:
+async def worker_translate(name: str, index: int, total_count: int, semaphore: asyncio.Semaphore, translator:GoogleTranslator) -> Tuple[str, str]:
     """单个频道名称的翻译工作函数。"""
-    try:
-        # 使用 GoogleTranslator 的单例/实例，线程安全
-        translator = GoogleTranslator(source=source_lang, target=target_lang) 
-        translated_text = translator.translate(name)
-        
-        with print_lock:
-            progress_percent = ((index + 1) / total_count) * 100
-            print(f"翻译进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
-                  f"原始: {name[:20]:<20} -> 翻译: {translated_text[:20]:<20}", end="\r")
+    await asyncio.sleep(TRANSLATION_DELAY) # 允许事件循环在启动任务时切换
+    async with semaphore:
+        try:
+            # 关键：使用 asyncio.to_thread() 将阻塞的翻译操作推送到单独的线程执行
+            # 这样就不会阻塞主事件循环
+            translated_text = await asyncio.to_thread(translator.translate, name)
             
-        return (name, translated_text)
-    except Exception as e:
-        with print_lock:
-            print(f"\n❌ 警告：线程 {index + 1} 翻译失败: {name}. 错误: {e}")
-        return (name, name) # 失败时返回原始名称
-
-def translate_channels_concurrent(unique_names: List[str]) -> Dict[str, str]:
+            # 由于 to_thread 在线程中执行，我们仍然使用 print_lock 来保护 print
+            with print_lock:
+                progress_percent = ((index + 1) / total_count) * 100
+                # 使用 sys.stdout.write 替代 print(end='\r') 以更好地控制进度显示
+                sys.stdout.write(
+                    f"\r翻译进度: {index + 1}/{total_count} ({progress_percent:.1f}%) | "
+                    f"原始: {name[:20]:<20} -> 翻译: {translated_text[:20]:<20}"
+                )
+                sys.stdout.flush()
+                
+            return (name, translated_text)
+            
+        except Exception as e:
+            with print_lock:
+                # 打印错误时，需要换行以确保进度行不被覆盖
+                sys.stdout.write(f"\n❌ 警告：线程 {index + 1} 翻译失败: {name}. 错误: {e}\n")
+                sys.stdout.flush()
+            return (name, name) # 失败时返回原始名称
+            
+async def translate_channels_concurrent(unique_names: List[str]) -> Dict[str, str]:
     """
     使用多线程加速翻译频道名称。
     """
     channel_map = {}
     total_count = len(unique_names)
 
-    print(f"\n--- 步骤 4: 自动翻译频道名称 (TURBO模式 - {total_count}个) ---")
-    print(f"🚀 使用 {MAX_WORKERS} 个线程并发翻译。")
+    semaphore = asyncio.Semaphore(MAX_WORKERS)
+    translator = GoogleTranslator(source=SOURCE_LANG, target=TARGET_LANG)      
 
-    futures = []
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        for i, name in enumerate(unique_names):
-            future = executor.submit(
-                worker_translate,
+    print(f"\n--- 步骤 4: 自动翻译频道名称 (TURBO模式 - {total_count}个) ---")
+    print(f"🚀 使用 {MAX_WORKERS} 个并发翻译。")
+
+    tasks = []
+    for i, name in enumerate(unique_names):
+        task = asyncio.create_task(
+            worker_translate(
                 name,
                 i,
                 total_count,
-                TARGET_LANG,
-                SOURCE_LANG
+                semaphore,
+                translator
             )
-            futures.append(future)
-            # 线程启动间添加延迟，避免瞬间发送过多请求导致封锁
-            time.sleep(TRANSLATION_DELAY) 
-
-        # 收集所有已完成的翻译结果
-        for future in as_completed(futures):
-            original, translated = future.result()
-            channel_map[original] = translated
+        )
+    tasks.append(task)
+    # asyncio.gather 等待所有任务完成
+    results = await asyncio.gather(*tasks)    
+    for original, translated in results:
+        channel_map[original] = translated    
 
     print("\n" + " " * 80, end="\r") # 清除进度行
     print(f"✅ 频道翻译完成。已成功翻译 {len(channel_map)} 个名称。")
@@ -740,10 +724,10 @@ def build_and_save_final_m3u8(final_streams: List[Dict[str, str]], country_map: 
         print(f"✅ 文件构建完成。新文件已保存到：{output_path}")
 
     except Exception as e:
-        print(f"❌ 写入文件时发生错误: {e}")
+        print(f"❌ 写入文件时发生错误: {e}")    
 
 # --- 主程序入口 ---
-def main():
+async def main():
     start_time = time.time()
 
     # 关闭 requests 库发出的不必要的 InsecureRequestWarning
@@ -757,16 +741,15 @@ def main():
         all_streams = download_and_merge_sources(source)
         
         if not all_streams:
-            print("程序终止：未能从任何源获取到流数据。")
-            return
+            print("未能从任何源获取到流数据。 url=", source)
+            continue
 
         # 步骤 2: 流可用性检查 (清理无效流) - 使用 FFmpeg
-        # working_streams = async_check_stream_availability(all_streams)
-        working_streams = asyncio.run(async_check_stream_availability(all_streams))
+        working_streams =  await async_check_stream_availability(all_streams)
 
         if not working_streams:
-            print("程序终止：所有流均不可用或检查失败。")
-            return
+            print("所有流均不可用或检查失败。 url=", source)
+            continue
 
         # 步骤 3: IP 地理位置分类 (仅针对 group="Undefined")
         # 此步骤仍使用 requests 库访问 GeoIP API
@@ -775,7 +758,7 @@ def main():
         # 步骤 4: 提取唯一名称并翻译 (并发)
         # 此步骤仍使用 deep_translator 库
         unique_channels = sorted(list(set(s['name'] for s in classified_streams)))
-        channel_translation_map = translate_channels_concurrent(unique_channels)
+        channel_translation_map = await translate_channels_concurrent(unique_channels)
 
         # 步骤 5: 构建和保存最终文件
         build_and_save_final_m3u8(classified_streams, COUNTRY_MAPPING, channel_translation_map, outfile)
@@ -788,4 +771,4 @@ def main():
     print("="*50)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())    
