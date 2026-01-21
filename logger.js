@@ -1,86 +1,32 @@
 /**
- * DUOLIN 针对 2023-05-23/batch 接口的专项补丁
- * 逻辑：解析 responses[0].body 字符串 -> 修改 -> 重新转为字符串
+ * DUOLIN 计数诊断脚本 (不解析版本)
+ * 目的：统计拦截次数及包大小，排查并发漏抓问题
  */
 
-let body = $response.body;
-let url = $request.url;
+const url = $request.url;
+const body = $response.body;
+const logPrefix = `[DUOLIN_COUNT]`;
 
-if (!body || !body.trim().startsWith('{')) {
-    $done({});
+// 增加一个全局计数器（在脚本多次运行间保持，部分插件支持）
+if (typeof $duo_counter === 'undefined') {
+    var $duo_counter = 1;
+} else {
+    $duo_counter++;
 }
 
-try {
-    let obj = JSON.parse(body);
-    let isModified = false;
-    console.log(`[DUOLIN_BATCH] 🚀 拦截成功: ${url}`);
+console.log(`${logPrefix} 🔔 第 ${$duo_counter} 次拦截到 Batch`);
+console.log(`${logPrefix} 🌐 URL: ${url}`);
 
-    // --- 核心修改逻辑 ---
-    const patchData = (data, tag) => {
-        let changed = false;
-        
-        // 1. 修改宝石 (Gems)
-        if (data.gems !== undefined) {
-            console.log(`[DUOLIN_BATCH] 🎯 [${tag}] 发现宝石: ${data.gems} -> 改为 999999`);
-            data.gems = 999999;
-            changed = true;
-        }
-
-        // 2. 修改等级与能量 (Subscriber & Energy)
-        if (data.subscriberLevel !== undefined) {
-            console.log(`[DUOLIN_BATCH] 🎯 [${tag}] 发现等级: ${data.subscriberLevel} -> 改为 MAX`);
-            data.subscriberLevel = "MAX";
-            changed = true;
-        }
-        
-        if (data.energy !== undefined) {
-            data.energy = 5;
-            data.unlimitedEnergyAvailable = true;
-            changed = true;
-        }
-
-        // 3. 会员标识
-        data.hasPlus = true;
-        data.isMax = true;
-
-        // 4. 递归检查内部 (如 data.user.gems)
-        for (let key in data) {
-            if (data[key] && typeof data[key] === 'object') {
-                if (patchData(data[key], `${tag}.${key}`)) changed = true;
-            }
-        }
-        return changed;
-    };
-
-    // --- 处理 Batch 数组 ---
-    if (obj.responses && Array.isArray(obj.responses)) {
-        obj.responses.forEach((res, index) => {
-            // 关键点：处理嵌套在 body 字段里的 JSON 字符串
-            if (res.body && typeof res.body === 'string' && res.body.trim().startsWith('{')) {
-                console.log(`[DUOLIN_BATCH] 🔍 正在解包 Batch[${index}].body 字符串...`);
-                try {
-                    let subObj = JSON.parse(res.body);
-                    if (patchData(subObj, `Batch[${index}]`)) {
-                        // 修改后必须重新转回字符串缝合回去
-                        res.body = JSON.stringify(subObj);
-                        isModified = true;
-                    }
-                } catch (e) {
-                    console.log(`[DUOLIN_BATCH] ❌ Batch[${index}] 解析失败: ${e.message}`);
-                }
-            }
-        });
-    }
-
-    if (isModified) {
-        console.log("[DUOLIN_BATCH] ✅ 补丁应用成功，正在下发修改后的数据");
-        $done({ body: JSON.stringify(obj) });
-    } else {
-        console.log("[DUOLIN_BATCH] 🧊 未发现可修改字段");
-        $done({});
-    }
-
-} catch (e) {
-    console.log(`[DUOLIN_BATCH] 💀 脚本异常: ${e.message}`);
-    $done({});
+if (body) {
+    // 仅计算长度，不解析内容，确保超大包也不会卡顿
+    console.log(`${logPrefix} 📊 响应体大小: ${(body.length / 1024).toFixed(2)} KB`);
+    
+    // 快速检查关键字位置，但不解包
+    const hasGems = body.indexOf('"gems"') !== -1;
+    const hasLevel = body.indexOf('"subscriberLevel"') !== -1;
+    console.log(`${logPrefix} 🔍 关键字段探测: gems(${hasGems}), level(${hasLevel})`);
+} else {
+    console.log(`${logPrefix} ⚠️ 响应体为空`);
 }
+
+$done({});
