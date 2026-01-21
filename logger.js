@@ -1,29 +1,82 @@
-/*
- * Gzip/JSON 打印脚本
- * 作用：打印出请求 URL 和解压后的响应体，不做任何修改
+/**
+ * Duolingo iOS App 终极补丁 (支持 Batch 嵌套字符串解析)
+ * 功能：解锁 MAX 等级、无限能量/红心、注入 Super 订阅凭证
  */
 
-const url = $request.url;
-const method = $request.method;
-const body = $response.body;
+let body = $response.body;
+if (!body) $done({});
 
-// 确保响应体存在，并且是文本类型
-if (body && typeof body === 'string') {
-    // 打印请求方法和 URL
-    console.log(`[LOGGER] METHOD: ${method}, URL: ${url}`);
-    
-    try {
-        // 尝试解析为 JSON，如果成功，就打印格式化的 JSON
-        const jsonBody = JSON.parse(body);
-        console.log("【JSON BODY】:\n" + JSON.stringify(jsonBody, null, 2));
-    } catch (e) {
-        // 如果不是 JSON，就打印文本内容
-        console.log("【TEXT BODY】:\n" + body.substring(0, 500) + (body.length > 500 ? "..." : ""));
+try {
+    let obj = JSON.parse(body);
+
+    // --- 核心修改逻辑：针对用户数据对象进行字段重写 ---
+    const patchData = (data) => {
+        if (!data || typeof data !== 'object') return;
+
+        // 1. 修改身份等级（针对你抓到的 subscriberLevel）
+        if (data.subscriberLevel !== undefined) {
+            data.subscriberLevel = "MAX"; 
+        }
+
+        // 2. 针对能量系统 (Energy) 的全覆盖
+        if (data.energy !== undefined) data.energy = 5;
+        if (data.unlimitedEnergyAvailable !== undefined) {
+            data.unlimitedEnergyAvailable = true;
+        }
+        if (data.energyContext) {
+            data.energyContext.isUnlimitedEnergyEnabled = true;
+            data.energyContext.unlimitedEnergyAvailable = true;
+        }
+
+        // 3. 针对红心系统 (Hearts) 的全覆盖 (PC/Web 兼容)
+        if (data.health) {
+            data.health.unlimitedHeartsAvailable = true;
+            data.health.hearts = 5;
+            if (data.health.predictionContext) {
+                data.health.predictionContext.isUnlimitedHeartsEnabled = true;
+            }
+        }
+
+        // 4. 注入 Super 订阅凭证 (让 App UI 彻底变色)
+        data.hasPlus = true;
+        data.isMax = true;
+        if (!data.trackingProperties) data.trackingProperties = {};
+        data.trackingProperties.has_item_premium_subscription = true;
+        
+        if (!data.shopItems) data.shopItems = {};
+        data.shopItems["premium_subscription"] = {
+            "itemName": "premium_subscription",
+            "subscriptionInfo": {
+                "vendor": "STRIPE",
+                "renewing": true,
+                "isFamilyPlan": true,
+                "expectedExpiration": 9999999999000
+            }
+        };
+    };
+
+    // --- 逻辑分流：处理 Batch 嵌套字符串 或 普通请求 ---
+    if (obj.responses && Array.isArray(obj.responses)) {
+        // 针对你抓到的 {"responses": [{"body": "{...}"}]} 结构
+        obj.responses.forEach(res => {
+            if (res.body && typeof res.body === 'string' && res.body.startsWith('{')) {
+                try {
+                    let subObj = JSON.parse(res.body);
+                    patchData(subObj);
+                    res.body = JSON.stringify(subObj); // 重新缝合回字符串
+                } catch (e) {
+                    console.log("Sub-body parse failed");
+                }
+            }
+        });
+    } else {
+        // 如果是直接返回用户对象的普通请求
+        patchData(obj);
     }
-} else {
-    // 打印空内容或非文本内容
-    console.log(`[LOGGER] URL: ${url} 响应体为空或非文本数据。`);
-}
 
-// 必须调用 $done({})，并且不带任何修改参数，表示不对流量做任何修改，直接放行。
-$done({});
+    $done({ body: JSON.stringify(obj) });
+
+} catch (e) {
+    console.log("DuoMax overall error: " + e);
+    $done({});
+}
