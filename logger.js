@@ -18,7 +18,7 @@ if (isRequest) {
         } else if (body.includes("getGems")) {
             delay = 800;    // 第二个包延迟 0.8s
         } else {
-            delay = 1500;   // 其他包延迟 1.5s
+            delay = 3000;   // 其他包延迟 1.5s
         }
 
         console.log(`[DUOLIN_DELAY] ⏳ 探测到并发，强行延迟 ${delay}ms: ${url}`);
