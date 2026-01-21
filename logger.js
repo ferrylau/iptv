@@ -35,7 +35,7 @@ if (isRequest) {
 
 } else {
     // --- 【响应阶段：数据注入】 ---
-     console.log(`[DUOLIN_ONE]');
+     console.log('[DUOLIN_ONE]');
     let body = $response.body;
     if (!body || body.length < 5) $done({});
 
