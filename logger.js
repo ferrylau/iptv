@@ -1,84 +1,57 @@
 /**
- * DUOLIN 深度扫描补丁
+ * DUOLIN 域名全量探测脚本
+ * 目标：记录 *.duolingo.com 和 *.duolingo.cn 的所有 Batch 结构
  */
 
-let body = $response.body;
-let url = $request.url;
+const url = $request.url;
+const body = $response.body;
+const logPrefix = `[DUOLIN_SNIFFER]`;
 
-if (!body || !body.trim().startsWith('{')) $done({});
+if (!body || !body.trim().startsWith('{')) {
+    $done({});
+}
 
 try {
-    let obj = JSON.parse(body);
-    let isModified = false;
+    const obj = JSON.parse(body);
+    console.log(`${logPrefix} 📥 拦截到请求: ${url}`);
 
-    // --- 修改函数：涵盖所有已知字段 ---
-    const patchEverything = (data, tag) => {
-        let changed = false;
-        
-        // 打印该层级的 Key，确认我们是否进对了地方
-        console.log(`[DUOLIN_TRACE] 🔎 [${tag}] 字段预览: ${Object.keys(data).slice(0,10).join(", ")}`);
+    // 递归探测函数：记录所有包含关键信息的路径
+    const sniff = (data, path) => {
+        if (!data || typeof data !== 'object') return;
 
-        // 宝石/货币修改
-        const gemKeys = ['gems', 'totalGems', 'rupees', 'currencyReward'];
-        gemKeys.forEach(k => {
-            if (data[k] !== undefined) {
-                console.log(`[DUOLIN_TRACE] 🎯 命中宝石 [${k}]: ${data[k]} -> 999999`);
-                data[k] = 999999;
-                changed = true;
+        // 记录当前层级的 Key，方便分析结构
+        const keys = Object.keys(data);
+        if (keys.includes('gems') || keys.includes('subscriberLevel') || keys.includes('energy')) {
+            console.log(`${logPrefix} 🎯 发现关键字段! 路径: ${path} | 字段内容: ${JSON.stringify(data)}`);
+        }
+
+        // 继续向下探测
+        keys.forEach(key => {
+            if (data[key] && typeof data[key] === 'object') {
+                sniff(data[key], `${path}.${key}`);
             }
         });
-
-        // 会员等级与能量修改
-        if (data.subscriberLevel !== undefined) {
-            console.log(`[DUOLIN_TRACE] 🎯 命中等级: ${data.subscriberLevel} -> MAX`);
-            data.subscriberLevel = "MAX";
-            changed = true;
-        }
-
-        if (data.energy !== undefined) {
-            data.energy = 5;
-            data.unlimitedEnergyAvailable = true;
-            changed = true;
-        }
-
-        // 递归查找子项 (如 user.gems)
-        for (let key in data) {
-            if (data[key] && typeof data[key] === 'object') {
-                if (patchEverything(data[key], `${tag}.${key}`)) changed = true;
-            }
-        }
-        return changed;
     };
 
-    console.log(`[DUOLIN_TRACE] 🚀 处理 URL: ${url.split('?')[0]}`);
-
     if (obj.responses && Array.isArray(obj.responses)) {
+        console.log(`${logPrefix} 📦 检测到 Batch 结构，子响应数: ${obj.responses.length}`);
         obj.responses.forEach((res, index) => {
             if (res.body && typeof res.body === 'string' && res.body.trim().startsWith('{')) {
-                console.log(`[DUOLIN_TRACE] 📦 解析 Batch[${index}] Body 字符串内容...`);
                 try {
-                    let subObj = JSON.parse(res.body);
-                    if (patchEverything(subObj, `Batch[${index}]`)) {
-                        res.body = JSON.stringify(subObj);
-                        isModified = true;
-                    }
+                    const subObj = JSON.parse(res.body);
+                    console.log(`${logPrefix} 🔍 正在扫描 Batch[${index}] 的嵌套 Body...`);
+                    sniff(subObj, `Batch[${index}].body`);
                 } catch (e) {
-                    console.log(`[DUOLIN_TRACE] ⚠️ 解析 Batch[${index}] 失败: ${e.message}`);
+                    console.log(`${logPrefix} ⚠️ Batch[${index}] 内容无法解析为 JSON`);
                 }
             }
         });
     } else {
-        if (patchEverything(obj, "Single")) isModified = true;
-    }
-
-    if (isModified) {
-        console.log("[DUOLIN_TRACE] ✅ 修改成功，数据已注入。");
-        $done({ body: JSON.stringify(obj) });
-    } else {
-        $done({});
+        sniff(obj, "Root");
     }
 
 } catch (e) {
-    console.log(`[DUOLIN_TRACE] ❌ 异常: ${e.message}`);
-    $done({});
+    console.log(`${logPrefix} ❌ 探测解析失败: ${e.message}`);
 }
+
+$done({});
