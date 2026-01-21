@@ -1,57 +1,47 @@
 /**
- * DUOLIN 域名全量探测脚本
- * 目标：记录 *.duolingo.com 和 *.duolingo.cn 的所有 Batch 结构
+ * DUOLIN 快速扫描器 - 解决日志中断问题
  */
 
-const url = $request.url;
 const body = $response.body;
-const logPrefix = `[DUOLIN_SNIFFER]`;
-
-if (!body || !body.trim().startsWith('{')) {
-    $done({});
-}
+if (!body || !body.trim().startsWith('{')) $done({});
 
 try {
     const obj = JSON.parse(body);
-    console.log(`${logPrefix} 📥 拦截到请求: ${url}`);
+    console.log(`[DUOLIN_SNIFFER] 📥 拦截成功 | URL: ${$request.url.split('/batch')[0]}`);
 
-    // 递归探测函数：记录所有包含关键信息的路径
-    const sniff = (data, path) => {
-        if (!data || typeof data !== 'object') return;
+    if (obj.responses && obj.responses[0] && obj.responses[0].body) {
+        let resBody = obj.responses[0].body;
+        
+        // 如果 body 是字符串，尝试解包
+        if (typeof resBody === 'string' && resBody.trim().startsWith('{')) {
+            console.log(`[DUOLIN_SNIFFER] 🔍 正在解压 Batch[0].body 字符串...`);
+            const subObj = JSON.parse(resBody);
+            
+            // 1. 打印第一层所有的 Key，帮我们定位大模块
+            const topKeys = Object.keys(subObj);
+            console.log(`[DUOLIN_SNIFFER] 📦 第一层字段预览: ${topKeys.slice(0, 30).join(", ")}`);
 
-        // 记录当前层级的 Key，方便分析结构
-        const keys = Object.keys(data);
-        if (keys.includes('gems') || keys.includes('subscriberLevel') || keys.includes('energy')) {
-            console.log(`${logPrefix} 🎯 发现关键字段! 路径: ${path} | 字段内容: ${JSON.stringify(data)}`);
-        }
-
-        // 继续向下探测
-        keys.forEach(key => {
-            if (data[key] && typeof data[key] === 'object') {
-                sniff(data[key], `${path}.${key}`);
+            // 2. 定向搜索你发现的关键字段
+            if (subObj.subscriberLevel) {
+                console.log(`[DUOLIN_SNIFFER] 🎯 发现等级字段: ${subObj.subscriberLevel}`);
             }
-        });
-    };
+            if (subObj.gems !== undefined) {
+                console.log(`[DUOLIN_SNIFFER] 🎯 发现宝石字段: ${subObj.gems}`);
+            }
 
-    if (obj.responses && Array.isArray(obj.responses)) {
-        console.log(`${logPrefix} 📦 检测到 Batch 结构，子响应数: ${obj.responses.length}`);
-        obj.responses.forEach((res, index) => {
-            if (res.body && typeof res.body === 'string' && res.body.trim().startsWith('{')) {
-                try {
-                    const subObj = JSON.parse(res.body);
-                    console.log(`${logPrefix} 🔍 正在扫描 Batch[${index}] 的嵌套 Body...`);
-                    sniff(subObj, `Batch[${index}].body`);
-                } catch (e) {
-                    console.log(`${logPrefix} ⚠️ Batch[${index}] 内容无法解析为 JSON`);
+            // 3. 针对你图片中看到的结构，尝试进入 user 对象
+            if (subObj.user) {
+                console.log(`[DUOLIN_SNIFFER] 👤 发现 user 对象，包含字段: ${Object.keys(subObj.user).slice(0, 20).join(", ")}`);
+                if (subObj.user.subscriberLevel) {
+                    console.log(`[DUOLIN_SNIFFER] 🎯 user.subscriberLevel: ${subObj.user.subscriberLevel}`);
                 }
             }
-        });
+        }
     } else {
-        sniff(obj, "Root");
+        console.log(`[DUOLIN_SNIFFER] 🧊 Batch[0] 不含有效的 JSON body`);
     }
-
 } catch (e) {
-    console.log(`${logPrefix} ❌ 探测解析失败: ${e.message}`);
+    console.log(`${[DUOLIN_SNIFFER]} ❌ 报错: ${e.message}`);
 }
 
 $done({});
