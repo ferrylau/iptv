@@ -21,13 +21,14 @@ if (typeof $response !== 'undefined') {
 
         // --- 2. 处理 Batch 特有的转义嵌套字段 ---
         // 这一步是为了确保在复杂 JSON 字符串中也能改掉数值
-        // if (body.includes('"responses"')) {
-        //     modifiedBody = modifiedBody
-        //         .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
-        //         .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":999'); // 转义体力修改
-        // }
+        if (body.includes('"responses"')) {
+            modifiedBody = modifiedBody
+                .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
+                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":999') // 转义体力修改
+                .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"Super\\"');
+        }
 
-        console.log(`[DUOLIN_FINAL] ✅ 注入完成 (宝石:999999, 体力:999)`);
+        console.log(`[DUOLIN_FINAL] ✅ 注入完成 (宝石:999999, 体力:100)`);
         $done({ body: modifiedBody });
     }
 } else {
