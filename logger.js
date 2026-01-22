@@ -25,7 +25,7 @@ if (typeof $response !== 'undefined') {
             modifiedBody = modifiedBody
                 .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
                 .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":666') // 转义体力修改
-                .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"SUPER\\"')
+                .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"Super\\"')
                 .replace(/\\"allowPersonalizedAds\\"\s*:\s*true/g, '\\"allowPersonalizedAds\\":false');
         }
 
