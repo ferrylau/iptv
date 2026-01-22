@@ -1,0 +1,14 @@
+#!name=Duolingo Max 完美解锁
+#!desc=解锁多邻国(CN/Global)无限能量/红心与 Max 会员标识。支持 Batch 批量接口深度解析。
+
+
+[Script]
+# 挂载请求端负责延迟
+http-request ^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/logger.js, requires-body=true, tag=DUOLIN_DELAY
+
+# 挂载响应端负责修改
+http-response ^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/logger.js, requires-body=true, timeout=20, max-size=-1, tag=DUOLIN_FIX
+
+[MITM]
+# 确保域名包含在解密列表中
+hostname = %APPEND% ios-api-2.duolingo.cn, *.duolingo.cn,*.duolingo.com
