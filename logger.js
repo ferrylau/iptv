@@ -23,7 +23,7 @@ if (typeof $response !== 'undefined') {
         // 这一步是为了确保在复杂 JSON 字符串中也能改掉数值
         if (body.includes('"responses"')) {
             modifiedBody = modifiedBody
-                .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":500')
+                // .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":500')
                 .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":1000') // 转义体力修改
                 .replace(/\\"maxEnergy\\":\s*\d+/g, '\\"maxEnergy\\":1000')
                 .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"Super\\"')
