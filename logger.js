@@ -26,7 +26,7 @@ if (typeof $response !== 'undefined') {
                 .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
                 .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":555') // 转义体力修改
                 .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"Super\\"')
-                .replace(/\\"has_item_premium_subscription\\"\s*:\s*true/g, '\\"has_item_premium_subscription\\":true')
+                .replace(/\\"has_item_premium_subscription\\"\s*:\s*false/g, '\\"has_item_premium_subscription\\":true')
                 .replace(/\\"allowPersonalizedAds\\"\s*:\s*true/g, '\\"allowPersonalizedAds\\":false');
                 
         }
