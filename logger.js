@@ -24,8 +24,9 @@ if (typeof $response !== 'undefined') {
         if (body.includes('"responses"')) {
             modifiedBody = modifiedBody
                 .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
-                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":888') // 转义体力修改
-                .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"1\\"');
+                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":777') // 转义体力修改
+                .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"plus\\"')
+                .replace(/\\"allowPersonalizedAds\\":\s*\\".*?\\"/g, '\\"allowPersonalizedAds\\":false');
         }
 
         console.log(`[DUOLIN_FINAL] ✅ 注入完成 (宝石:999999, 体力:100)`);
