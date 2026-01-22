@@ -1,59 +1,40 @@
 /**
- * DUOLIN Master Script
- * 功能：1. 请求端根据特征分配延迟，强行错开并发 2. 响应端执行注入
+ * DUOLIN 最终优化版 (针对 max-size=-1 环境)
+ * 功能：1. 屏蔽请求端干扰 2. 响应端注入宝石、体力、会员等级
  */
 
-const isRequest = typeof $request !== 'undefined' && typeof $response === 'undefined';
+// 检查是否为响应阶段
+if (typeof $response !== 'undefined') {
+    let body = $response.body;
+    
+    // 如果没有内容，直接结束
+    if (!body || body.length < 5) {
+        $done({});
+    } else {
+        console.log(`[DUOLIN_FINAL] 📥 拦截响应 (长度: ${body.length})`);
 
-if (isRequest) {
-    // --- 【请求阶段：制造时差】 ---
-    (async () => {
-        const url = $request.url;
-        const body = $request.body || "";
-        
-        // 根据请求体特征分配延迟，确保三个 batch 不会撞在一起
-        let delay = 0;
-        if (body.includes("getConfig")) {
-            delay = 0;      // 第一个包不延迟
-        } else if (body.includes("getGems")) {
-            delay = 800;    // 第二个包延迟 0.8s
-        } else {
-            delay = 3000;   // 其他包延迟 1.5s
+        // --- 1. 执行非转义字段正则注入 ---
+        let modifiedBody = body
+            .replace(/"gems":\s*\d+/g, '"gems":999999')
+            .replace(/"totalGems":\s*\d+/g, '"totalGems":999999')
+            .replace(/"energy":\s*\d+/g, '"energy":100') // 修改体力为 100
+            .replace(/"subscriberLevel":\s*".*?"/g, '"subscriberLevel":"MAX"')
+            .replace(/"unlimitedEnergyAvailable":\s*\w+/g, '"unlimitedEnergyAvailable":true')
+            .replace(/"hasPlus":\s*\w+/g, '"hasPlus":true');
+
+        // --- 2. 处理 Batch 特有的转义嵌套字段 ---
+        // 这一步是为了确保在复杂 JSON 字符串中也能改掉数值
+        if (body.includes('"responses"')) {
+            modifiedBody = modifiedBody
+                .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
+                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":100') // 转义体力修改
+                .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"MAX\\"');
         }
 
-        console.log(`[DUOLIN_DELAY] ⏳ 探测到并发，强行延迟 ${delay}ms: ${url}`);
-        
-        // 异步等待
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // 关键：修改 Header 进一步防止复用
-        let headers = $request.headers;
-        headers['Connection'] = 'close';
-        
-        $done({ headers });
-    })();
-
-} else {
-    // --- 【响应阶段：数据注入】 ---
-    let body = $response.body;
-    if (!body || body.length < 5) $done({});
-
-    console.log(`[DUOLIN_FIX] 📥 拦截到响应 (长度: ${body.length})`);
-
-    // 执行正则注入
-    let modifiedBody = body
-        .replace(/"gems":\s*\d+/g, '"gems":999999')
-        .replace(/"totalGems":\s*\d+/g, '"totalGems":999999')
-        .replace(/"subscriberLevel":\s*".*?"/g, '"subscriberLevel":"MAX"')
-        .replace(/"unlimitedEnergyAvailable":\s*\w+/g, '"unlimitedEnergyAvailable":true')
-        .replace(/"hasPlus":\s*\w+/g, '"hasPlus":true');
-
-    // 处理 Batch 嵌套
-    if (body.includes('"responses"')) {
-        modifiedBody = modifiedBody
-            .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
-            .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"MAX\\"');
+        console.log(`[DUOLIN_FINAL] ✅ 注入完成 (宝石:999999, 体力:100)`);
+        $done({ body: modifiedBody });
     }
-
-    $done({ body: modifiedBody });
+} else {
+    // 请求端直接跳过，不加延迟，不改 Header
+    $done({});
 }
