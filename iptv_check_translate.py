@@ -53,8 +53,8 @@ MAX_WORKERS = 30      # 并发线程数：用于翻译
 TIMEOUT = 5          # 默认请求超时时间（秒）
 
 # 新增：流可用性检查配置
-STREAM_CHECK_WORKERS = 20 # 并发线程数：用于流检查
-STREAM_CHECK_TIMEOUT = 5  # 检查超时时间（秒），用于快速判断连接
+STREAM_CHECK_WORKERS = 50 # 并发线程数：用于流检查（优化：减少并发数以降低带宽压力）
+STREAM_CHECK_TIMEOUT = 3  # 检查超时时间（秒），用于快速判断连接（优化：减少检测时长）
 FFMPEG_BINARY = "ffmpeg"  # FFmpeg 可执行文件名称 (通常在系统 PATH 中)
 
 # 硬编码的国家分组对照表 (英文 -> 中文)
@@ -659,7 +659,7 @@ async def translate_channels_concurrent(unique_names: List[str]) -> Dict[str, st
                 translator
             )
         )
-    tasks.append(task)
+        tasks.append(task)
     # asyncio.gather 等待所有任务完成
     results = await asyncio.gather(*tasks)    
     for original, translated in results:
