@@ -1,40 +1,44 @@
 /**
- * DUOLIN 最终优化版 (针对 max-size=-1 环境)
- * 功能：1. 屏蔽请求端干扰 2. 响应端注入宝石、体力、会员等级
+ * DUOLIN 最终优化版
+ * 目标：精确修改 energyConfig 内部的 energy 字段
  */
 
-// 检查是否为响应阶段
 if (typeof $response !== 'undefined') {
     let body = $response.body;
     
-    // 如果没有内容，直接结束
     if (!body || body.length < 5) {
         $done({});
     } else {
-        console.log(`[DUOLIN_FINAL] 📥 拦截响应 (长度: ${body.length})`);
+        console.log(`[DUOLIN_FIX] 📥 拦截响应 (长度: ${body.length})`);
 
-        // --- 1. 执行非转义字段正则注入 ---
+        // --- 1. 修改基础字段 (宝石与会员) ---
         let modifiedBody = body
             .replace(/"gems":\s*\d+/g, '"gems":999999')
             .replace(/"totalGems":\s*\d+/g, '"totalGems":999999')
-            .replace(/"energy":\s*\d+/g, '"energy":100') // 修改体力为 100
             .replace(/"subscriberLevel":\s*".*?"/g, '"subscriberLevel":"MAX"')
             .replace(/"unlimitedEnergyAvailable":\s*\w+/g, '"unlimitedEnergyAvailable":true')
             .replace(/"hasPlus":\s*\w+/g, '"hasPlus":true');
 
-        // --- 2. 处理 Batch 特有的转义嵌套字段 ---
-        // 这一步是为了确保在复杂 JSON 字符串中也能改掉数值
+        // --- 2. 修改 energyConfig 内部的 energy (普通格式) ---
+        // 匹配逻辑：找到 "energyConfig":{... "energy":X ...}
+        // 使用正则 lookahead 确保只改配置里的 energy
+        modifiedBody = modifiedBody.replace(/("energyConfig"\s*:\s*\{[^\}]*"energy"\s*:\s*)\d+/g, '$1100');
+
+        // --- 3. 修改 Batch 转义格式内的 energy ---
+        // 匹配逻辑：\\"energyConfig\\":{... \\"energy\\":X ...}
         if (body.includes('"responses"')) {
+            // 修改嵌套内的宝石和等级
             modifiedBody = modifiedBody
                 .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":999999')
-                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":100') // 转义体力修改
                 .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"MAX\\"');
+            
+            // 精确修改嵌套内的 energy
+            modifiedBody = modifiedBody.replace(/(\\"energyConfig\\"\s*:\s*\{[^\}]*\\"energy\\"\s*:\s*)\d+/g, '$1100');
         }
 
-        console.log(`[DUOLIN_FINAL] ✅ 注入完成 (宝石:999999, 体力:100)`);
+        console.log(`[DUOLIN_FIX] ✅ 注入完成 (宝石:999999, 体力:100)`);
         $done({ body: modifiedBody });
     }
 } else {
-    // 请求端直接跳过，不加延迟，不改 Header
     $done({});
 }
