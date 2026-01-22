@@ -24,8 +24,8 @@ if (typeof $response !== 'undefined') {
         if (body.includes('"responses"')) {
             modifiedBody = modifiedBody
                 // .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":500')
-                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":1000') // 转义体力修改
-                .replace(/\\"maxEnergy\\":\s*\d+/g, '\\"maxEnergy\\":1000')
+                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":500') // 转义体力修改
+                // .replace(/\\"maxEnergy\\":\s*\d+/g, '\\"maxEnergy\\":1000')
                 .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"Super\\"')
                 .replace(/\\"has_item_premium_subscription\\"\s*:\s*false/g, '\\"has_item_premium_subscription\\":true')
                 .replace(/\\"allowPersonalizedAds\\"\s*:\s*true/g, '\\"allowPersonalizedAds\\":false');
