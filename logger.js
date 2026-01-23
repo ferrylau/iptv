@@ -20,7 +20,7 @@ if (typeof $response !== 'undefined' && $response.body) {
             // if (innerBody.gems !== undefined) innerBody.gems = 8888;
             
             // 修改等级与视觉
-            innerBody.subscriberLevel = "2";
+            innerBody.subscriberLevel = "SUPER";
             innerBody.plus_super_branding = true;
             innerBody.hasPlus = true;
 
