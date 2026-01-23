@@ -20,7 +20,8 @@ if (typeof $request !== 'undefined' && $request.body) {
                 let fieldsObj = fieldsToJson(decodedFields);
                 if (fieldsObj.gems) {
 
-                    delete fieldsObj.courses; 
+                    delete fieldsObj.currentCourse.smartTips; 
+                    delete fieldsObj.currentCourse.skills;                     
                     
                     // 4. 将 JSON 对象还原为字符串并重新编码
                     let newFields = jsonToFields(fieldsObj);
