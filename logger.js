@@ -20,13 +20,13 @@ if (typeof $response !== 'undefined' && $response.body) {
             // if (innerBody.gems !== undefined) innerBody.gems = 8888;
             
             // 修改等级与视觉
-            innerBody.subscriberLevel = "SUPER";
-            innerBody.plus_super_branding = true;
+            // innerBody.subscriberLevel = "SUPER";
+            // innerBody.plus_super_branding = true;
             innerBody.hasPlus = true;
 
             // 修改体力 (处理嵌套的 energyConfig)
             if (innerBody.energyConfig) {
-                innerBody.energyConfig.energy = 500;
+                innerBody.energyConfig.energy = 600;
                 innerBody.energyConfig.maxEnergy = 555;
             }            
 
@@ -40,9 +40,7 @@ if (typeof $response !== 'undefined' && $response.body) {
             innerBody.adsConfig = undefined;
 
             // 4. 将修改后的对象重新封包成字符串
-            obj.responses[0].body = JSON.stringify(innerBody);
-
-            
+            obj.responses[0].body = JSON.stringify(innerBody);            
 
             console.log("[DUOLIN] ✅ 内部数据注入完成");
 
