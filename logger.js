@@ -1,40 +1,46 @@
 /**
- * DUOLIN 内存优化版 (专门针对 50M 内存限制)
+ * DUOLIN 嵌套解析版
+ * 专门解决 responses[0].body 内部数据的解析与修改
  */
 
 if (typeof $response !== 'undefined' && $response.body) {
-    let body = $response.body;
-    
-    // 1. 快速过滤：如果包太小或者不包含关键字，直接退出，不消耗内存
-    if (body.length < 500 || body.indexOf('subscriberLevel') === -1) {
-        $done({});
-    } else {
-        // 2. 使用更简单的字符串替换，而不是复杂的捕获组正则
-        // 这样可以极大地降低内存占用
-        try {
-            let m = body;
-            
-            // 处理转义格式 (最占用内存的部分)
-            if (m.indexOf('"responses"') !== -1) {
-                m = m.replace(/\\"subscriberLevel\\":\\".*?\\"/g, '\\"subscriberLevel\\":\\"SUPER\\"')
-                    // .replace(/\\"gems\\":\d+/g, '\\"gems\\":8888')
-                     .replace(/\\"energy\\":\d+/g, '\\"energy\\":500')
-                     .replace(/\\"maxEnergy\\":\d+/g, '\\"maxEnergy\\":500')
-                     .replace(/\\"allowPersonalizedAds\\":true/g, '\\"allowPersonalizedAds\\":false')
-                     .replace(/\\"isActivated\\":true/g, '\\"isActivated\\":false')                     
-                     .replace(/\\"plus_super_branding\\":false/g, '\\"plus_super_branding\\":true');
-            }
-            
-            // 处理非转义格式
-            m = m.replace(/"gems":\d+/g, '"gems":8888')
-                 .replace(/"subscriberLevel":".*?"/g, '"subscriberLevel":"SUPER"');
+    let obj = JSON.parse($response.body);
 
-            $done({ body: m });
+    // 1. 检查是否存在 responses 数组且第一个元素有 body
+    if (obj.responses && obj.responses[0] && obj.responses[0].body) {
+        try {
+            // 2. 将嵌套的字符串解析为真正的 JSON 对象
+            let innerBody = JSON.parse(obj.responses[0].body);
+            console.log("[DUOLIN] 📥 内部 Body 解析成功");
+
+            // 3. 在这里执行精准修改
+            // 修改宝石
+            // if (innerBody.gems !== undefined) innerBody.gems = 8888;
+            
+            // 修改等级与视觉
+            innerBody.subscriberLevel = "SUPER";
+            innerBody.plus_super_branding = true;
+
+            // 修改体力 (处理嵌套的 energyConfig)
+            if (innerBody.energyConfig) {
+                innerBody.energyConfig.energy = 600;
+                innerBody.energyConfig.maxEnergy = 600;
+            }            
+
+            // 关闭广告开关
+            innerBody.allowPersonalizedAds = false;
+
+            // 4. 将修改后的对象重新封包成字符串
+            obj.responses[0].body = JSON.stringify(innerBody);
+            console.log("[DUOLIN] ✅ 内部数据注入完成");
+
         } catch (e) {
-            console.log("[DUOLIN] 内存溢出风险，跳过本次修改");
-            $done({});
+            console.log("[DUOLIN] ❌ 内部 Body 解析失败: " + e);
         }
     }
+
+    // 5. 最后导出完整的 body
+    $done({ body: JSON.stringify(obj) });
 } else {
     $done({});
 }
