@@ -23,7 +23,7 @@ if (typeof $request !== 'undefined' && $request.body) {
                     delete fieldsObj.trackingProperties; 
                     delete fieldsObj.plusDiscounts;        
                     delete fieldsObj.inviteURL
-                    delete fieldsObj.health             
+                    // delete fieldsObj.health             
                     delete fieldsObj.chinaUserModerationRecords
                     delete fieldsObj.adsConfig
                     delete fieldsObj.referralInfo
