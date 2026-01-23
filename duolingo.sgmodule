@@ -3,17 +3,10 @@
 #!desc=解锁多邻国(CN/Global)无限能量/红心与 Max 会员标识。支持 Batch 批量接口深度解析。
 #!author=ferrylau
 
-[Body Rewrite]
-# 方案：精准匹配 energyConfig 块内部的数字
-# 匹配 "energy": 后面跟着的 1 到 3 位数字，替换为 999
-http-response ^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch "energy":\d{1,3} "energy":999
-
-# 匹配 "maxEnergy": 后面跟着的数字，替换为 999
-http-response ^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch "maxEnergy":\d{1,3} "maxEnergy":999
 
 [Script]
 # 修改发送给服务器的请求 (精简字段)
-#duolingoReq= type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js ,requires-body=1
+duolingoReq= type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js ,requires-body=1
 
 # 挂载响应端负责修改
 #duolingoResp= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoResp.js, requires-body=true, timeout=10, max-size=-1
