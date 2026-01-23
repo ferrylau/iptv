@@ -9,7 +9,7 @@
 duolingoReq= type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js ,requires-body=1
 
 # 挂载响应端负责修改
-duolingoResp= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoResp.js, requires-body=true, timeout=10, max-size=-1
+duolingoResp= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoResp.js, requires-body=true, timeout=10, max-size=5,242,880
 
 [MITM]
 # 确保域名包含在解密列表中
