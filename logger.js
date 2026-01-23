@@ -4,6 +4,8 @@
  */
 
 if (typeof $response !== 'undefined' && $response.body) {
+    console.log("[DUOLIN] 原始包大小: " + ($response.body.length / 1024 / 1024).toFixed(2) + " MB");
+
     let obj = JSON.parse($response.body);
 
     // 1. 检查是否存在 responses 数组且第一个元素有 body
