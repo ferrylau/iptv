@@ -26,13 +26,14 @@ if (typeof $response !== 'undefined' && $response.body) {
 
             // 修改体力 (处理嵌套的 energyConfig)
             if (innerBody.energyConfig) {
-                innerBody.energyConfig.energy = 511;
+                innerBody.energyConfig.energy = 500;
                 innerBody.energyConfig.maxEnergy = 555;
             }            
 
             // 关闭广告开关
-            innerBody.allowPersonalizedAds = false;
-            innerBody.trackingProperties.disable_ads_and_tracking_consent = true
+            // innerBody.allowPersonalizedAds = false;
+            // innerBody.trackingProperties.disable_ads_and_tracking_consent = true;
+            innerBody.trackingProperties.has_item_premium_subscription  = true
 
             // 删除字段
             innerBody.plusDiscounts = undefined;
