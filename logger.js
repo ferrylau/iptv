@@ -18,20 +18,28 @@ if (typeof $response !== 'undefined' && $response.body) {
             // if (innerBody.gems !== undefined) innerBody.gems = 8888;
             
             // 修改等级与视觉
-            innerBody.subscriberLevel = "SUPER";
+            innerBody.subscriberLevel = "2";
             innerBody.plus_super_branding = true;
 
             // 修改体力 (处理嵌套的 energyConfig)
             if (innerBody.energyConfig) {
-                innerBody.energyConfig.energy = 600;
-                innerBody.energyConfig.maxEnergy = 600;
+                innerBody.energyConfig.energy = 555;
+                innerBody.energyConfig.maxEnergy = 555;
             }            
 
             // 关闭广告开关
             innerBody.allowPersonalizedAds = false;
+            innerBody.trackingProperties.disable_ads_and_tracking_consent = true
+
+            // 删除字段
+            innerBody.plusDiscounts = undefined;
+            innerBody.adsConfig = undefined;
 
             // 4. 将修改后的对象重新封包成字符串
             obj.responses[0].body = JSON.stringify(innerBody);
+
+            
+
             console.log("[DUOLIN] ✅ 内部数据注入完成");
 
         } catch (e) {
