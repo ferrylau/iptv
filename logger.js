@@ -20,13 +20,13 @@ if (typeof $response !== 'undefined' && $response.body) {
             // if (innerBody.gems !== undefined) innerBody.gems = 8888;
             
             // 修改等级与视觉
-            // innerBody.subscriberLevel = "SUPER";
+            innerBody.subscriberLevel = "PLUSSUPER";
             // innerBody.plus_super_branding = true;
             innerBody.hasPlus = true;
 
             // 修改体力 (处理嵌套的 energyConfig)
             if (innerBody.energyConfig) {
-                innerBody.energyConfig.energy = 600;
+                innerBody.energyConfig.energy = 700;
                 innerBody.energyConfig.maxEnergy = 555;
             }            
 
