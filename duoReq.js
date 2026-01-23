@@ -20,7 +20,7 @@ if (typeof $request !== 'undefined' && $request.body) {
                 let fieldsObj = fieldsToJson(decodedFields);
                 if (fieldsObj.gems) {
 
-                    // delete fieldsObj.trackingProperties; 
+                    delete fieldsObj.trackingProperties; 
                     // delete fieldsObj.plusDiscounts;        
                     // delete fieldsObj.inviteURL
                     // delete fieldsObj.chinaUserModerationRecords
