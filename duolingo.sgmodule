@@ -5,8 +5,11 @@
 
 
 [Script]
+# 修改发送给服务器的请求 (精简字段)
+duo_req_mod = type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/logger.js ,requires-body=1
+
 # 挂载响应端负责修改
-duolingo= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/logger.js, requires-body=true, timeout=10, max-size=-1
+#duolingo= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/logger.js, requires-body=true, timeout=10, max-size=-1
 
 [MITM]
 # 确保域名包含在解密列表中
