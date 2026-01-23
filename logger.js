@@ -76,7 +76,7 @@ if (typeof $request !== 'undefined' && $request.body) {
                 // 2. 将字段字符串转换为 JSON 对象
                 let fieldsObj = fieldsToJson(decodedFields);
                 if (fieldsObj.gems) {
-                    delete fieldsObj.gems; 
+                    // delete fieldsObj.gems; 
                     delete fieldsObj.energyConfig; 
                     delete fieldsObj.courses; 
                     
