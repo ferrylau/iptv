@@ -1,41 +1,40 @@
 /**
- * DUOLIN 最终优化版 (针对 max-size=-1 环境)
- * 功能：1. 屏蔽请求端干扰 2. 响应端注入宝石、体力、会员等级
+ * DUOLIN 内存优化版 (专门针对 50M 内存限制)
  */
 
-// 检查是否为响应阶段
-if (typeof $response !== 'undefined') {
+if (typeof $response !== 'undefined' && $response.body) {
     let body = $response.body;
     
-    // 如果没有内容，直接结束
-    if (!body || body.length < 5) {
+    // 1. 快速过滤：如果包太小或者不包含关键字，直接退出，不消耗内存
+    if (body.length < 500 || body.indexOf('subscriberLevel') === -1) {
         $done({});
     } else {
-        console.log(`[DUOLIN_FINAL] 📥 拦截响应 (长度: ${body.length})`);
+        // 2. 使用更简单的字符串替换，而不是复杂的捕获组正则
+        // 这样可以极大地降低内存占用
+        try {
+            let m = body;
+            
+            // 处理转义格式 (最占用内存的部分)
+            if (m.indexOf('"responses"') !== -1) {
+                m = m.replace(/\\"subscriberLevel\\":\\".*?\\"/g, '\\"subscriberLevel\\":\\"SUPER\\"')
+                    // .replace(/\\"gems\\":\d+/g, '\\"gems\\":8888')
+                     .replace(/\\"energy\\":\d+/g, '\\"energy\\":500')
+                     .replace(/\\"maxEnergy\\":\d+/g, '\\"maxEnergy\\":500')
+                     .replace(/\\"allowPersonalizedAds\\":true/g, '\\"allowPersonalizedAds\\":false')
+                     .replace(/\\"isActivated\\":true/g, '\\"isActivated\\":false')                     
+                     .replace(/\\"plus_super_branding\\":false/g, '\\"plus_super_branding\\":true');
+            }
+            
+            // 处理非转义格式
+            m = m.replace(/"gems":\d+/g, '"gems":8888')
+                 .replace(/"subscriberLevel":".*?"/g, '"subscriberLevel":"SUPER"');
 
-        // --- 1. 执行非转义字段正则注入 ---
-        let modifiedBody = body
-            // .replace(/"gems":\s*\d+/g, '"gems":999999')
-            // .replace(/"energy":\s*\d+/g, '"energy":999') // 修改体力为 100
-            // .replace(/"subscriberLevel":\s*".*?"/g, '"subscriberLevel":"1"');
-
-        // --- 2. 处理 Batch 特有的转义嵌套字段 ---
-        // 这一步是为了确保在复杂 JSON 字符串中也能改掉数值
-        if (body.includes('"responses"')) {
-            modifiedBody = modifiedBody
-                // .replace(/\\"gems\\":\s*\d+/g, '\\"gems\\":500')
-                .replace(/\\"energy\\":\s*\d+/g, '\\"energy\\":550') // 转义体力修改
-                .replace(/\\"maxEnergy\\":\s*\d+/g, '\\"maxEnergy\\":1000');
-                // .replace(/\\"subscriberLevel\\":\s*\\".*?\\"/g, '\\"subscriberLevel\\":\\"Super\\"')
-                // .replace(/\\"has_item_premium_subscription\\"\s*:\s*false/g, '\\"has_item_premium_subscription\\":true')
-                // .replace(/\\"allowPersonalizedAds\\"\s*:\s*true/g, '\\"allowPersonalizedAds\\":false');
-                
+            $done({ body: m });
+        } catch (e) {
+            console.log("[DUOLIN] 内存溢出风险，跳过本次修改");
+            $done({});
         }
-
-        console.log(`[DUOLIN_FINAL] ✅ 注入完成 (宝石:999999, 体力:100)`);
-        $done({ body: modifiedBody });
     }
 } else {
-    // 请求端直接跳过，不加延迟，不改 Header
     $done({});
 }
