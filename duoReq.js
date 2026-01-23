@@ -31,7 +31,7 @@ if (typeof $request !== 'undefined' && $request.body) {
                     // delete fieldsObj.gemsConfig;
                     // delete fieldsObj.energyConfig;
 
-                    delete fieldsObj.currentCourse;
+                    delete fieldsObj.currentCourse.pathSectioned;
                     // 4. 将 JSON 对象还原为字符串并重新编码
                     let newFields = jsonToFields(fieldsObj);
                     root.requests[0].url = baseUrl + "fields=" + encodeURIComponent(newFields);
