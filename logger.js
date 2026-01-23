@@ -78,6 +78,8 @@ if (typeof $request !== 'undefined' && $request.body) {
                 if (fieldsObj.gems) {
                     delete fieldsObj.gems; 
                     delete fieldsObj.energyConfig; 
+                    delete fieldsObj.courses; 
+                    
                     // 4. 将 JSON 对象还原为字符串并重新编码
                     let newFields = jsonToFields(fieldsObj);
                     root.requests[0].url = baseUrl + "fields=" + encodeURIComponent(newFields);
