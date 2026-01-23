@@ -20,15 +20,15 @@ if (typeof $request !== 'undefined' && $request.body) {
                 let fieldsObj = fieldsToJson(decodedFields);
                 if (fieldsObj.gems) {
 
-                    delete fieldsObj.trackingProperties; 
-                    delete fieldsObj.plusDiscounts;        
-                    delete fieldsObj.inviteURL
-                    // delete fieldsObj.health             
-                    delete fieldsObj.chinaUserModerationRecords
-                    delete fieldsObj.adsConfig
-                    delete fieldsObj.referralInfo
-                    delete fieldsObj.energyConfig
-                    
+                    // delete fieldsObj.trackingProperties; 
+                    // delete fieldsObj.plusDiscounts;        
+                    // delete fieldsObj.inviteURL
+                    // delete fieldsObj.chinaUserModerationRecords
+                    // delete fieldsObj.adsConfig
+                    // delete fieldsObj.referralInfo
+                    // delete fieldsObj.energyConfig
+                    delete fieldsObj.currentCourse
+
                     // 4. 将 JSON 对象还原为字符串并重新编码
                     let newFields = jsonToFields(fieldsObj);
                     root.requests[0].url = baseUrl + "fields=" + encodeURIComponent(newFields);
