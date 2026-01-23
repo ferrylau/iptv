@@ -22,10 +22,11 @@ if (typeof $response !== 'undefined' && $response.body) {
             // 修改等级与视觉
             innerBody.subscriberLevel = "2";
             innerBody.plus_super_branding = true;
+            innerBody.hasPlus = true;
 
             // 修改体力 (处理嵌套的 energyConfig)
             if (innerBody.energyConfig) {
-                innerBody.energyConfig.energy = 555;
+                innerBody.energyConfig.energy = 511;
                 innerBody.energyConfig.maxEnergy = 555;
             }            
 
