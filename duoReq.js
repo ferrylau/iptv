@@ -27,6 +27,7 @@ if (typeof $request !== 'undefined' && $request.body) {
                     delete fieldsObj.chinaUserModerationRecords
                     delete fieldsObj.adsConfig
                     delete fieldsObj.referralInfo
+                    delete fieldsObj.energyConfig
                     
                     // 4. 将 JSON 对象还原为字符串并重新编码
                     let newFields = jsonToFields(fieldsObj);
