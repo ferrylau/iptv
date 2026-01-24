@@ -15,9 +15,14 @@ if (typeof $request !== 'undefined' && $request.url && $request.body) {
     // 判断是否是目标 URL 和是否包含 'gemsConfig'
     if (requestUrl.includes(targetUrlPath) && requestBody.includes('gemsConfig')) {
         // 重定向目标请求
-        // 提取原始 URL 的 path 部分，并与代理地址拼接
-        const originalUrlObj = new URL(requestUrl);
-        const newUrl = upstreamProxyUrl + originalUrlObj.pathname + originalUrlObj.search;
+
+        // --- URL parsing workaround for environments without URL constructor ---
+        // 找到第一个 '/' 在协议之后，提取 path 部分
+        const pathStartIndex = requestUrl.indexOf('/', requestUrl.indexOf('://') + 3); 
+        const pathAndQuery = pathStartIndex !== -1 ? requestUrl.substring(pathStartIndex) : '/';
+        // --- End of workaround ---
+
+        const newUrl = upstreamProxyUrl + pathAndQuery; // 使用 workaround 的 pathAndQuery
         
         console.log(`[DUO-REQ] ✅ 发现目标 'gemsConfig' batch 请求，重定向至: ${newUrl}`);
 
