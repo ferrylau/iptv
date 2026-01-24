@@ -107,7 +107,7 @@
  * This version is compatible with JS environments that do not support the URL constructor.
  */
 
-const workerUrl = 'http://192.168.123.165:8787';
+const workerUrl = 'https://do.828762.xyz';
 
 const requestUrl = $request.url;
 

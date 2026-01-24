@@ -2,45 +2,11 @@
 #!desc=解锁多邻国。请求通过 URL Rewrite 重定向至已部署的公开 Cloudflare Worker。
 #!author=ferrylau (Modified by Gemini)
 
-# --- 方案一：使用远程脚本 (已注释掉) ---
-# [Script]
+[Script]
 # # 修改发送给服务器的请求 (精简字段)
-# duolingoReq= type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js ,requires-body=1
+duolingoReq= type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js ,requires-body=1
 # # 挂载响应端负责修改
 # #duolingoResp= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoResp.js, requires-body=true, timeout=5, max-size=-1
-# ---
-
-# --- 方案二：使用 URL Rewrite + IP 直接连接 (已注释掉，因小火箭 Bug 失效) ---
-# [Host]
-# # 告诉小火箭，对于 Worker 的 IP 地址，总是直接连接，不要走代理。
-# 192.168.123.165 = direct
-# [URL Rewrite]
-# ^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) http://192.168.123.165:8787/$2 header
-# ---
-
-# --- 方案三：使用 URL Rewrite + 自定义本地域名 (已注释掉，因小火箭 Bug 失效) ---
-# [Host]
-# # 发明一个本地域名，并让它指向 Worker 的真实 IP 地址
-# local.worker = 192.168.123.165
-# [URL Rewrite]
-# # 将 Duolingo 的请求重定向到我们发明的本地域名上
-# ^https?:\/\/.*\.duo\.lingo\.(cn|com)\/(.*) http://local.worker:8787/$2 header
-# ---
-
-
-# --- 方案四：重定向至 workers.dev 地址 (已注释掉) ---
-# [URL Rewrite]
-# # 将 Duolingo 的请求重定向到已部署的公开 Worker 地址
-# ^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) https://duolingo-worker.ferrylau23.workers.dev/$2 header
-# ---
-
-# --- 最终方案：重定向至自定义域名 ---
-
-[URL Rewrite]
-# 将 Duolingo 的请求重定向到已部署的自定义域名 Worker 地址
-^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) https://do.828762.xyz/$2 header
-
-# --- 通用配置 ---
 
 [MITM]
 # 确保域名包含在解密列表中
