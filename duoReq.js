@@ -1,140 +1,38 @@
 /**
- * DUOLINGO 请求体精准精简脚本
- * 逻辑：URL解码 -> 字符串转JSON对象 -> 剔除大字段 -> 还原回URL
+ * DUOLINGO 精准重定向脚本
+ * 根据请求体判断是否为 'gemsConfig' batch 请求，并重定向到本地 Python 服务。
+ * 其他请求直接放行到原始 Duolingo 服务器。
  */
 
-// if (typeof $request !== 'undefined' && $request.body) {
-//     try {
-//         let root = JSON.parse($request.body);
+// 确保在 http-request 脚本中使用，并且 requires-body = true
+if (typeof $request !== 'undefined' && $request.url && $request.body) {
+    const targetUrlPath = '/2023-05-23/batch';
+    const upstreamProxyUrl = 'https://la.828762.xyz:8433'; // 指向你的 Caddy/Python 服务器
+
+    const requestUrl = $request.url;
+    const requestBody = $request.body; // 注意：$request.body 在 Shadowrocket 中是字符串
+
+    // 判断是否是目标 URL 和是否包含 'gemsConfig'
+    if (requestUrl.includes(targetUrlPath) && requestBody.includes('gemsConfig')) {
+        // 重定向目标请求
+        // 提取原始 URL 的 path 部分，并与代理地址拼接
+        const originalUrlObj = new URL(requestUrl);
+        const newUrl = upstreamProxyUrl + originalUrlObj.pathname + originalUrlObj.search;
         
-//         if (root.requests && root.requests[0] && root.requests[0].url) {
-//             let url = root.requests[0].url;
-//             let parts = url.split('fields=');
-            
-//             if (parts.length === 2) {
-//                 let baseUrl = parts[0];
-//                 // 1. URL 解码
-//                 let decodedFields = decodeURIComponent(parts[1]);
+        console.log(`[DUO-REQ] ✅ 发现目标 'gemsConfig' batch 请求，重定向至: ${newUrl}`);
 
-//                 // 2. 将字段字符串转换为 JSON 对象
-//                 let fieldsObj = fieldsToJson(decodedFields);
-//                 if (fieldsObj.gems) {
-
-//                     // delete fieldsObj.trackingProperties; 
-//                     // delete fieldsObj.plusDiscounts;        
-//                     // delete fieldsObj.inviteURL
-//                     // delete fieldsObj.chinaUserModerationRecords
-//                     // delete fieldsObj.adsConfig
-//                     // delete fieldsObj.referralInfo
-//                     // delete fieldsObj.energyConfig
-//                     // delete fieldsObj.gems;
-//                     // delete fieldsObj.gemsConfig;
-//                     // delete fieldsObj.energyConfig;
-
-//                     delete fieldsObj.currentCourse.pathSectioned;
-//                     // 4. 将 JSON 对象还原为字符串并重新编码
-//                     let newFields = jsonToFields(fieldsObj);
-//                     root.requests[0].url = baseUrl + "fields=" + encodeURIComponent(newFields);
-                    
-//                     console.log("[DUO-REQ] ✅ 字段精简成功");
-//                 }
-//             }
-//         }
-//         $done({ body: JSON.stringify(root) });
-//     } catch (e) {
-//         console.log("[DUO-REQ] ❌ 修改失败: " + e);
-//         $done({});
-//     }
-// } else {
-//     $done({});
-// }
-
-// // --- 核心转换工具函数 ---
-
-// // 1. 字符串转 JSON (解析大括号嵌套)
-// function fieldsToJson(str) {
-//     let root = {};
-//     let stack = [root];
-//     let currentKey = "";
-
-//     for (let i = 0; i < str.length; i++) {
-//         let char = str[i];
-//         if (char === '{') {
-//             let newObj = {};
-//             stack[stack.length - 1][currentKey] = newObj;
-//             stack.push(newObj);
-//             currentKey = "";
-//         } else if (char === '}') {
-//             if (currentKey) stack[stack.length - 1][currentKey] = true;
-//             stack.pop();
-//             currentKey = "";
-//         } else if (char === ',') {
-//             if (currentKey) stack[stack.length - 1][currentKey] = true;
-//             currentKey = "";
-//         } else {
-//             currentKey += char;
-//         }
-//     }
-//     if (currentKey) root[currentKey] = true;
-//     return root;
-// }
-
-// // 2. JSON 转字符串 (还原多邻国语法)
-// function jsonToFields(obj) {
-//     let parts = [];
-//     for (let key in obj) {
-//         if (typeof obj[key] === 'object' && obj[key] !== null) {
-//             parts.push(`${key}{${jsonToFields(obj[key])}}`);
-//         } else {
-//             parts.push(key);
-//         }
-//     }
-//     return parts.join(',');
-// }
-
-
-
-/**
- * 小火箭脚本：将请求重定向至 CF，并携带原始 Body
- */
-/**
- * redirectToWorker.js (duoReq.js)
- * 
- * This script intercepts an HTTP request and redirects it to a local Cloudflare Worker.
- * It preserves the original path and adds a custom 'X-Original-Host' header
- * so the worker knows which upstream host to forward the request to.
- * 
- * This version is compatible with JS environments that do not support the URL constructor.
- */
-
-const workerUrl = 'https://do.828762.xyz';
-
-const requestUrl = $request.url;
-
-// --- URL parsing workaround ---
-// Extract host using a simple regex from the full URL
-const hostMatch = requestUrl.match(/https?:\/\/([^\/]+)/);
-const originalHost = hostMatch ? hostMatch[1] : null;
-
-// Extract path with query by finding the first '/' after the 'https://' part
-const pathStartIndex = requestUrl.indexOf('/', 8); 
-const pathAndQuery = pathStartIndex !== -1 ? requestUrl.substring(pathStartIndex) : '/';
-// --- End of workaround ---
-
-const newUrl = workerUrl + pathAndQuery;
-
-// Modify headers: add the original host to a custom header
-const newHeaders = {
-  ...$request.headers,
-  'X-Original-Host': originalHost
-};
-
-console.log(`[Redirect Script] Redirecting to: ${newUrl}`);
-console.log(`[Redirect Script] Original Host: ${originalHost}`);
-
-// Done, return the modified request object to the proxy tool
-$done({
-  url: newUrl,
-  headers: newHeaders,
-  body: $request.body // Pass the request body along
-});
+        $done({
+            url: newUrl,
+            headers: $request.headers, // 保持原始头部
+            body: $request.body // 保持原始请求体
+        });
+    } else {
+        // 非目标请求，直接放行到原始地址
+        console.log(`[DUO-REQ] ❌ 非目标请求，直接放行: ${requestUrl}`);
+        $done({}); // $done({}) 不修改请求，让其发往原始目的地
+    }
+} else {
+    // 如果没有 $request 或 $request.body，也直接放行
+    console.log(`[DUO-REQ] ❌ 脚本条件不满足，直接放行。`);
+    $done({});
+}
