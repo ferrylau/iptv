@@ -1,16 +1,12 @@
-#!url=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duolingo.sgmodule
-#!name=Duolingo Max 完美解锁
-#!desc=解锁多邻国(CN/Global)无限能量/红心与 Max 会员标识。支持 Batch 批量接口深度解析。
-#!author=ferrylau
+#!name=Duolingo Max 完美解锁 (CF Worker - URL Rewrite)
+#!desc=解锁多邻国。请求通过 URL Rewrite 重定向至本地 Cloudflare Worker。
+#!author=ferrylau (Modified for URL Rewrite)
 
-
-[Script]
-# 修改发送给服务器的请求 (精简字段)
-duolingoReq= type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js ,requires-body=1
-
-# 挂载响应端负责修改
-#duolingoResp= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoResp.js, requires-body=true, timeout=5, max-size=-1
+[URL Rewrite]
+# 匹配发往任意 Duolingo API 的请求，捕获其路径，然后重写到本地 Worker。
+# "header" 关键字会保留原始的 Host 头，并将其发送给 Worker。
+^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) http://192.168.123.165:8787/$2 header
 
 [MITM]
 # 确保域名包含在解密列表中
-hostname = %APPEND% ios-api-2.duolingo.cn, *.duolingo.cn,*.duolingo.com
+hostname = %APPEND% ios-api-2.duolingo.cn, *.duolingo.cn, *.duolingo.com
