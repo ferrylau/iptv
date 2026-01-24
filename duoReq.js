@@ -97,17 +97,29 @@
 /**
  * 小火箭脚本：将请求重定向至 CF，并携带原始 Body
  */
-let url = $request.url;
-let cfWorkerHost = "https://do.828762.xyz"; 
+// // duoReq.js - Modified for redirecting to Cloudflare Worker
 
-if (url.includes("batch")) {
-    let proxyUrl = `${cfWorkerHost}?target=${encodeURIComponent(url)}`;
-    
-    $done({
-        url: proxyUrl,
-        headers: $request.headers,
-        body: $request.body  // 确保请求体也被重定向发给 CF
-    });
-} else {
-    $done({});
-}
+const workerUrl = 'http://192.168.123.165:8787';
+
+const originalUrl = new URL($request.url);
+const originalHost = originalUrl.hostname;
+
+// Preserve the original path and query parameters
+const newPath = originalUrl.pathname + originalUrl.search;
+const newUrl = workerUrl + newPath;
+
+// Modify headers: add the original host
+const newHeaders = {
+  ...$request.headers,
+  'X-Original-Host': originalHost
+};
+
+console.log(`[Redirect Script] Redirecting to: ${newUrl}`);
+console.log(`[Redirect Script] Original Host: ${originalHost}`);
+
+// Done, return the modified request object to the proxy tool
+$done({
+  url: newUrl,
+  headers: newHeaders,
+  body: $request.body // Make sure to pass the body
+});
