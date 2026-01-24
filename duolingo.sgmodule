@@ -1,5 +1,5 @@
-#!name=Duolingo Max 完美解锁 (CF Worker - 最终版)
-#!desc=解锁多邻国。通过自定义域名和 URL Rewrite 结合的方式，绕开代理工具的 Bug，将请求重定向至本地 Worker。
+#!name=Duolingo Max 完美解锁 (CF Worker - 部署版)
+#!desc=解锁多邻国。请求通过 URL Rewrite 重定向至已部署的公开 Cloudflare Worker。
 #!author=ferrylau (Modified by Gemini)
 
 # --- 方案一：使用远程脚本 (已注释掉) ---
@@ -18,15 +18,27 @@
 # ^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) http://192.168.123.165:8787/$2 header
 # ---
 
-# --- 最终方案：使用 URL Rewrite + 自定义本地域名 (绕开小火箭 Bug) ---
+# --- 方案三：使用 URL Rewrite + 自定义本地域名 (已注释掉，因小火箭 Bug 失效) ---
+# [Host]
+# # 发明一个本地域名，并让它指向 Worker 的真实 IP 地址
+# local.worker = 192.168.123.165
+# [URL Rewrite]
+# # 将 Duolingo 的请求重定向到我们发明的本地域名上
+# ^https?:\/\/.*\.duo\.lingo\.(cn|com)\/(.*) http://local.worker:8787/$2 header
+# ---
 
-[Host]
-# 发明一个本地域名，并让它指向 Worker 的真实 IP 地址
-local.worker = 192.168.123.165
+
+# --- 方案四：重定向至 workers.dev 地址 (已注释掉) ---
+# [URL Rewrite]
+# # 将 Duolingo 的请求重定向到已部署的公开 Worker 地址
+# ^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) https://duolingo-worker.ferrylau23.workers.dev/$2 header
+# ---
+
+# --- 最终方案：重定向至自定义域名 ---
 
 [URL Rewrite]
-# 将 Duolingo 的请求重定向到我们发明的本地域名上
-^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) http://local.worker:8787/$2 header
+# 将 Duolingo 的请求重定向到已部署的自定义域名 Worker 地址
+^https?:\/\/.*\.duolingo\.(cn|com)\/(.*) https://do.828762.xyz/$2 header
 
 # --- 通用配置 ---
 
