@@ -11,10 +11,10 @@
 [URL Rewrite]
 # 将精确的 batch API 请求重定向到已部署的自定义域名 Worker 地址
 #^https://ios-api-2.duolingo.cn/(.*) https://do.828762.xyz/$1 header
-^https://ios-api-2.duolingo.cn/(.*) https://la.828762.xyz:8433$1 header
+#^https://ios-api-2.duolingo.cn/(.*) https://la.828762.xyz:8433$1 header
 
 #^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/batch)$ https://do.828762.xyz$1 header
-#^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/batch)$ https://la.828762.xyz:8433$1 header
+^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/batch)$ https://la.828762.xyz:8433$1 header
 
 # --- 通用配置 ---
 
