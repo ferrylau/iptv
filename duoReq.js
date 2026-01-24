@@ -97,18 +97,33 @@
 /**
  * 小火箭脚本：将请求重定向至 CF，并携带原始 Body
  */
-// // duoReq.js - Modified for redirecting to Cloudflare Worker
+/**
+ * redirectToWorker.js (duoReq.js)
+ * 
+ * This script intercepts an HTTP request and redirects it to a local Cloudflare Worker.
+ * It preserves the original path and adds a custom 'X-Original-Host' header
+ * so the worker knows which upstream host to forward the request to.
+ * 
+ * This version is compatible with JS environments that do not support the URL constructor.
+ */
 
 const workerUrl = 'http://192.168.123.165:8787';
 
-const originalUrl = new URL($request.url);
-const originalHost = originalUrl.hostname;
+const requestUrl = $request.url;
 
-// Preserve the original path and query parameters
-const newPath = originalUrl.pathname + originalUrl.search;
-const newUrl = workerUrl + newPath;
+// --- URL parsing workaround ---
+// Extract host using a simple regex from the full URL
+const hostMatch = requestUrl.match(/https?:\/\/([^\/]+)/);
+const originalHost = hostMatch ? hostMatch[1] : null;
 
-// Modify headers: add the original host
+// Extract path with query by finding the first '/' after the 'https://' part
+const pathStartIndex = requestUrl.indexOf('/', 8); 
+const pathAndQuery = pathStartIndex !== -1 ? requestUrl.substring(pathStartIndex) : '/';
+// --- End of workaround ---
+
+const newUrl = workerUrl + pathAndQuery;
+
+// Modify headers: add the original host to a custom header
 const newHeaders = {
   ...$request.headers,
   'X-Original-Host': originalHost
@@ -121,5 +136,5 @@ console.log(`[Redirect Script] Original Host: ${originalHost}`);
 $done({
   url: newUrl,
   headers: newHeaders,
-  body: $request.body // Make sure to pass the body
+  body: $request.body // Pass the request body along
 });
