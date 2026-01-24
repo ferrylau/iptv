@@ -2,6 +2,21 @@
 #!desc=解锁多邻国。请求通过 URL Rewrite 重定向至本地 Cloudflare Worker。
 #!author=ferrylau (Modified for URL Rewrite)
 
+# --- 原有脚本配置 (已注释掉) ---
+# [Script]
+# # 修改发送给服务器的请求 (精简字段)
+# duolingoReq= type=http-request,pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js ,requires-body=1
+#
+# # 挂载响应端负责修改
+# #duolingoResp= type=http-response, pattern=^https?:\/\/ios-api-2\.duolingo\.cn\/.*\/batch, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoResp.js, requires-body=true, timeout=5, max-size=-1
+# ---
+
+# --- 新增配置：使用 URL Rewrite + CF Worker ---
+
+[Host]
+# 告诉小火箭，对于 Worker 的 IP 地址，总是直接连接，不要走代理。
+192.168.123.165 = direct
+
 [URL Rewrite]
 # 匹配发往任意 Duolingo API 的请求，捕获其路径，然后重写到本地 Worker。
 # "header" 关键字会保留原始的 Host 头，并将其发送给 Worker。
