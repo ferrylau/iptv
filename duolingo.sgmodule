@@ -15,7 +15,7 @@ URL-REGEX,^https?:\/\/ios-api-2\.duolingo\.cn\/plus-promotions\/,REJECT
 # --- 最终方案：精确URL重定向 ---
 [URL Rewrite]
 # 将精确的 batch API 请求重定向到已部署的自定义域名 Worker 地址
-^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/(batch|config\?fields=.*|messaging\/ack-message\/|friend.*))$ https://do.828762.xyz$1 header
+^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://do.828762.xyz$1 header
 #^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://la.828762.xyz:8433$1 header
 
 #^https://ios-api-2.duolingo.cn/(.*) https://do.828762.xyz/$1 header
