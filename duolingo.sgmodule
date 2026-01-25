@@ -19,7 +19,7 @@ URL-REGEX,^https:\/\/ios-api-2\.duolingo\.cn\/2023-05-23\/users\/[0-9]+\/subscri
 #^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://do.828762.xyz$1 header
 #^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://la.828762.xyz:8433$1 header
 
-#^https://ios-api-2.duolingo.cn/(.*) https://do.828762.xyz/$1 header
+^https://ios-api-2.duolingo.cn/(.*) https://do.828762.xyz/$1 header
 #^https://ios-api-2.duolingo.cn/(.*) https://la.828762.xyz:8433/$1 header
 
 #^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/batch)$ https://do.828762.xyz$1 header
