@@ -27,4 +27,4 @@
 
 [MITM]
 # 确保域名包含在解密列表中
-hostname = %APPEND% ios-api-2.duolingo.cn, *.duolingo.cn, *.duolingo.com
+hostname = %APPEND% ios-api-2.duolingo.cn, *.duolingo.cn, *.duolingo.com, simg-ssl.duolingo.com
