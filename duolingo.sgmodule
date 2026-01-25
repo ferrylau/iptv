@@ -11,6 +11,8 @@
 [URL Rewrite]
 # 拦截广告预测请求
 ^https:\/\/ios-api-2\.duolingo\.cn\/plus-promotions\/ml-predictions\/centralized-decision - reject
+# 拦截视频促销广告
+^https:\/\/simg-ssl\.duolingo\.com\/videos\/promo\/.* - reject
 # 将精确的 batch API 请求重定向到已部署的自定义域名 Worker 地址
 ^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://do.828762.xyz$1 header
 #^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://la.828762.xyz:8433$1 header
