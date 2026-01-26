@@ -4,9 +4,9 @@
 
 [Rule]
 # 拦截广告决策和视频域名 (新增)
-DOMAIN,simg-ssl.duolingo.com,REJECT
-URL-REGEX,^https?:\/\/ios-api-2\.duolingo\.cn\/plus-promotions\/,REJECT
-URL-REGEX,^https:\/\/ios-api-2\.duolingo\.cn\/2023-05-23\/users\/[0-9]+\/subscription-catalog\?.*,REJECT
+#DOMAIN,simg-ssl.duolingo.com,REJECT
+#URL-REGEX,^https?:\/\/ios-api-2\.duolingo\.cn\/plus-promotions\/,REJECT
+#URL-REGEX,^https:\/\/ios-api-2\.duolingo\.cn\/2023-05-23\/users\/[0-9]+\/subscription-catalog\?.*,REJECT
 
 # --- 方案一：使用远程脚本 (已禁用) ---
 #[Script]
