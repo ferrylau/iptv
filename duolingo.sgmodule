@@ -21,8 +21,8 @@
 
 # 将 API 请求重定向到 Worker，并用路径前缀区分原始域名
 ^https://ios-api-2.duolingo.cn/(.*) https://do.828762.xyz/ios-api-2/$1 header
-^https://goals-api.duolingo.cn/(.*) https://do.828762.xyz/goals-api/$1 header
-^https://excess.duolingo.com/(.*) https://do.828762.xyz/excess-api/$1 header
+#^https://goals-api.duolingo.cn/(.*) https://do.828762.xyz/goals-api/$1 header
+#^https://excess.duolingo.com/(.*) https://do.828762.xyz/excess-api/$1 header
 #^https://ios-api-2.duolingo.cn/(.*) https://la.828762.xyz:8433/$1 header
 
 #^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/batch)$ https://do.828762.xyz$1 header
