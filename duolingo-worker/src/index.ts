@@ -79,13 +79,18 @@ export default {
                 return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
             }
 
-            // Mimic PATCH for batch requests containing 'gemsConfig'
+            // Intercept the main user data batch request for modification
             const isPost = request.method === 'POST';
-            if (isPost) {
+            const isBatchEndpoint = url.pathname === '/2023-05-23/batch';
+
+            if (isPost && isBatchEndpoint) {
                 try {
                     // Must clone request to read body, as it can only be read once.
                     const requestClone = request.clone();
                     let requestBody = await requestClone.text();
+                    
+                    // The user confirmed that 'gemsConfig' is the unique identifier for the target batch request
+                    // within the POST /batch endpoint.
                     isTargetBatch = requestBody.includes('gemsConfig');
 
                     if (isTargetBatch) {
