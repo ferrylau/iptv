@@ -15,9 +15,14 @@
 
 # --- 最终方案：精确URL重定向 ---
 [URL Rewrite]
-# --- 新的通用转发规则 (由 Gemini 添加) ---
-# 匹配所有 duolingo.cn 和 duolingo.com 的域名，并将其作为路径的第一部分转发给 Worker
-^https?:\/\/([^/]+duolingo\.(?:cn|com))(\/.*)?$ https://do.828762.xyz/$1$2 302
+# --- 新的精确转发规则 (由 Gemini 添加) ---
+# 将指定的 API 请求重定向到 Worker，并用路径前缀区分原始域名
+^https://ios-api-2.duolingo.cn/(.*) https://do.828762.xyz/ios-api-2/$1 header
+^https://goals-api.duolingo.cn/(.*) https://do.828762.xyz/goals-api/$1 header
+^https://excess.duolingo.com/(.*) https://do.828762.xyz/excess-api/$1 header
+^https://midas-bandits-prod.duolingo.cn/(.*) https://do.828762.xyz/midas-bandits-prod/$1 header
+^https://duolingo-leaderboards-prod.duolingo.cn/(.*) https://do.828762.xyz/duolingo-leaderboards-prod/$1 header
+^https://duolingo-achievements-prod.duolingo.cn/(.*) https://do.828762.xyz/duolingo-achievements-prod/$1 header
 
 # --- 旧的精确转发规则 (已禁用) ---
 # 将精确的 batch API 请求重定向到已部署的自定义域名 Worker 地址
