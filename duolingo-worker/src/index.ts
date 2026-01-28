@@ -153,8 +153,8 @@ export default {
                             innerBody.subscriberLevel = "MAX";
                             innerBody.hasPlus = true;
                             if (innerBody.energyConfig) {
-                                innerBody.energyConfig.energy = 50;
-                                innerBody.energyConfig.maxEnergy = 50;
+                                innerBody.energyConfig.energy = 500;
+                                innerBody.energyConfig.maxEnergy = 500;
                             }
                             if (innerBody.trackingProperties) {
                                 innerBody.trackingProperties.has_item_premium_subscription = true;
