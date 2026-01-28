@@ -1,35 +1,15 @@
 #!name=Duolingo Max 完美解锁 (CF Worker - 部署版)
-#!desc=解锁多邻国。通过精确URL重写重定向至已部署的公开 Cloudflare Worker。
+#!desc=解锁多邻国。无限能量，无广告
 #!author=ferrylau (Modified by Gemini)
 
-[Rule]
-# 拦截广告决策和视频域名 (新增)
-#DOMAIN,simg-ssl.duolingo.com,REJECT
-#URL-REGEX,^https?:\/\/ios-api-2\.duolingo\.cn\/plus-promotions\/,REJECT
-#URL-REGEX,^https:\/\/ios-api-2\.duolingo\.cn\/2023-05-23\/users\/[0-9]+\/subscription-catalog\?.*,REJECT
-
-# --- 方案一：使用远程脚本 (已禁用) ---
-#[Script]
-# # 修改发送给服务器的请求 (精确匹配，携带原始Host头)
-#duolingoReq= type=http-request,pattern=^https:\/\/ios-api-2\.duolingo\.cn\/2023-05-23\/batch$,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/duoReq.js,requires-body=true
-
-# --- 最终方案：精确URL重定向 ---
+# 精确URL重定向 ---
 [URL Rewrite]
-# 将精确的 batch API 请求重定向到已部署的自定义域名 Worker 地址
-#^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://do.828762.xyz$1 header
-#^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/.*)$ https://la.828762.xyz:8433$1 header
-
-# 将 API 请求重定向到 Worker，并用路径前缀区分原始域名
+# 将指定的 API 请求重定向到 Worker，并用路径前缀区分原始域名
 ^https://ios-api-2.duolingo.cn/(.*) https://do.828762.xyz/ios-api-2/$1 header
 ^https://goals-api.duolingo.cn/(.*) https://do.828762.xyz/goals-api/$1 header
 ^https://excess.duolingo.com/(.*) https://do.828762.xyz/excess-api/$1 header
-#^https://ios-api-2.duolingo.cn/(.*) https://la.828762.xyz:8433/$1 header
-
-#^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/batch)$ https://do.828762.xyz$1 header
-#^https:\/\/ios-api-2\.duolingo\.cn(\/2023-05-23\/batch)$ https://la.828762.xyz:8433$1 header
-
-# --- 通用配置 ---
+^https://simg-ssl.duolingo.com/(.*) https://do.828762.xyz/simg-ssl/$1 header
 
 [MITM]
 # 确保域名包含在解密列表中
-hostname = %APPEND% ios-api-2.duolingo.cn, *.duolingo.cn, *.duolingo.com, simg-ssl.duolingo.com, excess.duolingo.com
+hostname = %APPEND% , *.duolingo.cn, *.duolingo.com
