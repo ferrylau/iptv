@@ -1,6 +1,6 @@
 #!name=Duolingo Max 完美解锁 (CF Worker - 部署版)
 #!desc=解锁多邻国。无限能量，无广告
-#!author=ferrylau (Modified by Gemini)
+#!author=ferrylau
 
 # 精确URL重定向 ---
 [URL Rewrite]
