@@ -1,14 +1,15 @@
 /*
- * Quantumult X (小火箭) 脚本
  * 叮咚农场自动任务 (签到 + 喂食)
+ * 兼容 Quantumult X (小火箭) 和 Surge
  *
  * 最后更新: 2026-02-01
  *
  * 使用方法:
- * 1. 将此脚本文件放到 Quantumult X 的脚本目录下。
- * 2. 在 Quantumult X 中添加一个定时任务 (cron) 来每天自动运行此脚本。
- *    例如: `30 7 * * * dingdong_farm_checkin.js, tag=叮咚农场任务, enabled=true`
- *    这会在每天早上7:30执行一次。
+ * 1. 将此脚本文件放到 小火箭(Quantumult X) 或 Surge 的脚本目录中。
+ * 2. 添加一个定时任务 (cron) 来每天自动运行此脚本。
+ *    - 小火箭: [task_local]
+ *    - Surge:   [Script]
+ *    例如: `30 7 * * * dingdong_farm_checkin.js, tag=叮咚农场任务`
  *
  * 注意:
  * 脚本中的 Cookie 和其他身份验证信息可能需要定期更新。
@@ -28,6 +29,7 @@ const checkinConfig = {
     lng: '119.941419',
     propsId: '260201188207600071',
     seedId: '260201188212355071',
+agbp: 'application/json, text/plain, */*',
     cityNumber: '0901'
 };
 // --- 配置区结束 ---
@@ -51,34 +53,76 @@ const commonHeaders = {
     'Referer': 'https://game.m.ddxq.mobi/',
 };
 
-// 通用请求函数
+// --- 核心函数, 请勿修改 ---
+
+// 统一API的通知函数
+const notify = (title, subtitle, body) => {
+  if (typeof $task !== 'undefined') {
+    $notify(title, subtitle, body);
+  } else if (typeof $httpClient !== 'undefined') {
+    $notification.post(title, subtitle, body);
+  }
+};
+
+// 统一API的请求函数
 function sendRequest(options) {
     return new Promise((resolve, reject) => {
-        $task.fetch(options).then(response => {
-            if (response.statusCode === 200) {
-                resolve(JSON.parse(response.body));
-            } else {
-                reject(`HTTP Error: ${response.statusCode}`);
-            }
-        }).catch(reason => {
-            reject(`Request Failed: ${reason.error}`);
-        });
+        if (typeof $task !== 'undefined') {
+            // Quantumult X 环境
+            $task.fetch(options).then(response => {
+                if (response.statusCode >= 200 && response.statusCode < 300) {
+                    resolve(JSON.parse(response.body));
+                } else {
+                    reject(`HTTP Error: ${response.statusCode}`);
+                }
+            }).catch(reason => {
+                reject(`Request Failed: ${reason.error}`);
+            });
+        } else if (typeof $httpClient !== 'undefined') {
+            // Surge 环境
+            const requestOptions = {
+                url: options.url,
+                headers: options.headers,
+                body: options.body
+            };
+            $httpClient.get(requestOptions, (error, response, data) => {
+                if (error) {
+                    reject(`Request Failed: ${error}`);
+                    return;
+                }
+                if (response.status >= 200 && response.status < 300) {
+                    resolve(JSON.parse(data));
+                } else {
+                    reject(`HTTP Error: ${response.status}`);
+                }
+            });
+        } else {
+            reject("Unsupported environment: $task and $httpClient are not defined.");
+        }
     });
 }
+
+// 统一API的脚本结束函数
+const done = () => {
+    if (typeof $done !== 'undefined') {
+        $done();
+    }
+};
+
+// --- 业务逻辑函数 ---
 
 // 每日签到
 async function dailySign() {
     const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&taskCode=DAILY_SIGN`;
-    
     try {
         const data = await sendRequest({ url, headers: commonHeaders });
         if (data.success) {
             const reward = data.data.rewards[0];
             return `✅ 签到成功, 获得${reward.amount}g饲料`;
-        } else if (data.code === 2002) { // 假设2002是已经签到过的代码
+        } else if (data.code === 2002 || (data.msg && data.msg.includes("已完成"))) {
              return `ℹ️ 今日已签到,无需重复`;
         } else {
-            return `❌ 签到失败: ${data.msg}`;
+            return `❌ 签到失败: ${data.msg || '未知错误'}`;
         }
     } catch (error) {
         console.log(`签到异常: ${error}`);
@@ -95,7 +139,7 @@ async function feed() {
         if (data.success) {
             return `✅ ${data.data.msg}`;
         } else {
-            return `❌ 喂食失败: ${data.msg}`;
+            return `❌ 喂食失败: ${data.msg || '未知错误'}`;
         }
     } catch (error) {
         console.log(`喂食异常: ${error}`);
@@ -103,7 +147,7 @@ async function feed() {
     }
 }
 
-// 主执行函数
+// --- 主执行函数 ---
 (async () => {
     console.log("开始执行叮咚农场任务...");
     const results = [];
@@ -119,6 +163,6 @@ async function feed() {
     const summary = results.join('\n');
     console.log("任务执行完毕。");
     
-    $notify('叮咚农场任务报告', ' ', summary);
-    $done();
+    notify('叮咚农场任务报告', ' ', summary);
+    done();
 })();
