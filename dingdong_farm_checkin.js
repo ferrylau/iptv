@@ -18,20 +18,51 @@
 
 // --- 配置区 ---
 // 请在此处填入你自己的抓包信息
+/*
+Cookie: DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548
+User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/d53e701967a6e12aeb3905856bbb10913ec2442c relaunchId/5CC59B02-23E0-4173-801A-5EF1BFB58C6E
+ddmc-device-token: BMjsMHb5cUncPBW1zO0jKTOEQeA7Lc7pseTHdZFdFek6bKnzYx6mpWtvTueU+UWKquJo5ssIkJlldFf0oFbU4yw==
+ddmc-os-version: 18.7
+ddmc-api-version: 9.1.0
+ddmc-device-id: d53e701967a6e12aeb3905856bbb10913ec2442c
+ddmc-station-id: 611cd49cb5871d00015f5956
+
+* uid: 5c70ab5955af540f2c79ab4f
+* DeviceId: d53e701967a6e12aeb3905856bbb10913ec2442c
+* device\_token: BMjsMHb5cUncPBW1zO0jKTOEQeA7Lc7pseTHdZFdFek6bKnzYx6mpWtvTueU+UWKquJo5ssIkJlldFf0oFbU4yw==
+* propsId: 211006153587589079
+* seedId: 211006153587660079
+* User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) ...
+*/
 const checkinConfig = {
-    cookie: 'DDXQSESSID=g1906v4uv4ddu5934v0949dv096v968gql8xz06gg9duvge88ysz43o2qk6hzy07',
-    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/8e0c9e96aaec7e80497b235048b93a7f236eca9b relaunchId/BC1881F9-0782-43D4-8840-DBC8BB623017',
-    deviceToken: 'BLSfmhYcct0xbW9IGy3mrIe0k8zd+j04cj+AZYoKVJcOUF/4JtNl9+3iQvooQk+4/0f3ZK7pf/1EjQgURW3iCaQ==',
+    cookie: 'DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548',
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/d53e701967a6e12aeb3905856bbb10913ec2442c relaunchId/5CC59B02-23E0-4173-801A-5EF1BFB58C6E',
+    deviceToken: 'BMjsMHb5cUncPBW1zO0jKTOEQeA7Lc7pseTHdZFdFek6bKnzYx6mpWtvTueU+UWKquJo5ssIkJlldFf0oFbU4yw==',
     stationId: '611cd49cb5871d00015f5956',
-    uid: '5c8477e1dc92d018368ec747',
-    deviceId: '8e0c9e96aaec7e80497b235048b93a7f236eca9b',
+    uid: '5c70ab5955af540f2c79ab4f',
+    deviceId: 'd53e701967a6e12aeb3905856bbb10913ec2442c',
     lat: '30.272027',
     lng: '119.941419',
-    propsId: '260201188207600071',
-    seedId: '260201188212355071',
-agbp: 'application/json, text/plain, */*',
+    propsId: '211006153587589079',
+    seedId: '211006153587660079',
+    agbp: 'application/json, text/plain, */*',
     cityNumber: '0901'
 };
+
+// const checkinConfig = {
+//     cookie: 'DDXQSESSID=g1906v4uv4ddu5934v0949dv096v968gql8xz06gg9duvge88ysz43o2qk6hzy07',
+//     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/8e0c9e96aaec7e80497b235048b93a7f236eca9b relaunchId/BC1881F9-0782-43D4-8840-DBC8BB623017',
+//     deviceToken: 'BLSfmhYcct0xbW9IGy3mrIe0k8zd+j04cj+AZYoKVJcOUF/4JtNl9+3iQvooQk+4/0f3ZK7pf/1EjQgURW3iCaQ==',
+//     stationId: '611cd49cb5871d00015f5956',
+//     uid: '5c8477e1dc92d018368ec747',
+//     deviceId: '8e0c9e96aaec7e80497b235048b93a7f236eca9b',
+//     lat: '30.272027',
+//     lng: '119.941419',
+//     propsId: '260201188207600071',
+//     seedId: '260201188212355071',
+// agbp: 'application/json, text/plain, */*',
+//     cityNumber: '0901'
+// };
 // --- 配置区结束 ---
 
 const apiHost = 'https://farm.api.ddxq.mobi';
