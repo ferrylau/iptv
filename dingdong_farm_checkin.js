@@ -144,6 +144,8 @@ const done = () => {
 
 // 每日签到
 async function dailySign() {
+    const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&taskCode=DAILY_SIGN`;
+    try {
         const data = await sendRequest({ url, headers: commonHeaders });
         console.log('签到响应全文: ' + JSON.stringify(data));
         if (data.success) {
