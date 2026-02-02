@@ -340,13 +340,7 @@ async function fetchTaskList() {
     // 4. 执行喂食
     results.push(await feed());
 
-    // 5. 整理并打印所有日志和最终的任务列表
-    console.log("\n--- 任务列表 ---");
-    console.log(JSON.stringify(taskList, null, 2));
-
     const summary = results.filter(res => res).join('\n');
-    console.log("\n--- 任务总结 ---");
-    console.log(summary);
     console.log("任务执行完毕。");
 
     notify('叮咚农场任务报告', '', summary);
