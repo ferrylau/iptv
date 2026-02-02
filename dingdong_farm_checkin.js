@@ -4,29 +4,25 @@
  *
  * 最后更新: 2026-02-02
  *
- * 此版本为简化版, 抓取脚本只负责获取请求头和URL。
- * 你需要在下方主账号配置中, 手动填入你的喂食ID (propsId 和 seedId)。
+ * 新版抓取逻辑: 主账号通过在农场“喂食”一次, 即可自动抓取所有信息。
+ * 1. 自动抓取: 主账号的所有信息 (包括喂食ID) 均会自动获取。
+ * 2. 手动配置: 你仍可以在 configs 数组中添加更多手动配置的账号。
  */
 
 // --- 多账号配置 ---
 const configs = [
     // ==================================================================
     // 账号一: 自动抓取 (主账号)
-    // 此配置会自动读取由抓取脚本保存的请求头和URL。
-    // 你需要在这里手动填写该账号的喂食ID。
+    // 此配置会自动读取所有信息, 无需任何手动填写。
     {
         name: "主账号 (自动抓取)",
         useStore: true,
-        // *** 请在这里手动填入主账号的喂食ID ***
-        // 这两个ID通常比较固定, 可以从抓包中获取一次。
-        propsId: '211006153587589079', // 喂食道具ID
-        seedId: '211006153587660079'  // 种子ID
     },
 
     // ==================================================================
     // 账号二: 手动配置 (示例)
-    // 在这里填入你为别人手机抓包获取的所有信息。
-{
+    // 在这里填入你为别人手机抓包获取的信息。
+    {
         name: "yl",
         useStore: false,
         cookie: 'DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548',
@@ -51,8 +47,7 @@ const configs = [
 
 // --- 脚本核心逻辑 (以下部分无需修改) ---
 
-const ddxq_headers_key = "ddxq_headers";
-const ddxq_url_key = "ddxq_url";
+const ddxq_session_key = "ddxq_session";
 const apiHost = 'https://farm.api.ddxq.mobi';
 
 // 统一API的通知函数
@@ -107,14 +102,15 @@ function getURLParam(url, name) {
 // 加载和处理配置
 function processConfigs() {
     const processed = [];
-    const storedHeadersStr = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_headers_key) : null;
-    const storedUrl = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_url_key) : null;
+    const sessionStr = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_session_key) : null;
 
     for (const cfg of configs) {
         if (cfg.useStore) {
-            if (storedHeadersStr && storedUrl) {
+            if (sessionStr) {
                 console.log(`[${cfg.name}] 检测到已保存的会话信息, 将进行处理。`);
-                const storedHeaders = JSON.parse(storedHeadersStr);
+                const session = JSON.parse(sessionStr);
+                const storedHeaders = session.headers;
+                const storedUrl = session.url;
 
                 const getHeader = (key) => {
                     const headerKey = Object.keys(storedHeaders).find(h => h.toLowerCase() === key.toLowerCase());
@@ -132,6 +128,8 @@ function processConfigs() {
                     lat: getHeader('ddmc-latitude') || getURLParam(storedUrl, 'lat'),
                     lng: getHeader('ddmc-longitude') || getURLParam(storedUrl, 'lng'),
                     cityNumber: getHeader('ddmc-city-number') || getURLParam(storedUrl, 'city_number'),
+                    propsId: session.propsId, // 从session中自动获取
+                    seedId: session.seedId,   // 从session中自动获取
                 };
                 processed.push(newConfig);
             } else {
