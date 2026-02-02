@@ -5,100 +5,84 @@
  * 最后更新: 2026-02-02
  *
  * 此版本支持多账号, 并已适配 Shadowrocket。
- * 1. 自动抓取: 默认第一个账号使用 ddxq_header_catcher.js 自动抓取的信息。
+ * 1. 自动抓取: 默认第一个账号使用 ddxq_header_catcher.js 自动抓取的信息 (包括喂食ID)。
  * 2. 手动配置: 你可以在 configs 数组中添加更多账号。
- *    - 对于需要手动配置的账号, 请将 useStore 设置为 false。
- *    - 然后, 通过抓包工具获取该账号的 Cookie, User-Agent 等信息并填入。
  */
 
 // --- 多账号配置 ---
 const configs = [
     // ==================================================================
     // 账号一: 自动抓取 (主账号)
-    // 此配置会自动从 $persistentStore (由 ddxq_header_catcher.js 写入) 读取信息。
-    // 如果你只有一个账号或主账号使用自动抓取, 请保留此配置。
+    // 此配置会自动从 $persistentStore 读取所有信息, 无需任何手动填写。
     {
         name: "主账号 (自动抓取)",
         useStore: true,
-        // 下方的喂食ID, 如果自动抓取的账号也需要喂食, 请在此处填好
-        // 这两个ID通常比较固定, 可以从旧脚本或抓包中获取。
-        propsId: '211006153587589079',
-        seedId: '211006153587660079'
     },
 
     // ==================================================================
     // 账号二: 手动配置 (示例)
     // 在这里填入你为别人手机抓包获取的信息。
-    // 你可以复制这个对象来添加更多账号。
     {
-        name: "yl",
+        name: "朋友的账号 (手动)",
         useStore: false,
-        cookie: 'DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/d53e701967a6e12aeb3905856bbb10913ec2442c relaunchId/B24B9A97-3A4B-4FBD-BA87-18C9F821CCE3',
+        cookie: '在此填入抓包获取的Cookie',
+        userAgent: '在此填入抓包获取的User-Agent',
         
         // --- 以下所有 ddmc- 开头的参数都需要从抓包数据中获取 ---
-        // 你可以在请求头的 ddmc- 开头字段或URL参数中找到它们
-        deviceToken: 'BOmAJ4+wMEMav/3XWYarKlECOr25lzhlftlR1DmSyfvkHYzGwrCJ2/LeXwqPwJo1HPKq6BPFEz4Va+KyZr6edCw==', // ddmc-device-token
-        stationId: '611cd49cb5871d00015f5956',   // ddmc-station-id
-        uid: '5c70ab5955af540f2c79ab4f',         // ddmc-uid
-        deviceId: 'd53e701967a6e12aeb3905856bbb10913ec2442c',    // ddmc-device-id
-        lat: '30.272038',         // ddmc-latitude
-        lng: '119.941281',         // ddmc-longitude
-        cityNumber: '0901',  // ddmc-city-number
+        deviceToken: '', // ddmc-device-token
+        stationId: '',   // ddmc-station-id
+        uid: '',         // ddmc-uid
+        deviceId: '',    // ddmc-device-id
+        lat: '',         // ddmc-latitude
+        lng: '',         // ddmc-longitude
+        cityNumber: '',  // ddmc-city-number
 
         // --- 喂食ID也需要单独从抓包中获取 ---
-        propsId: '211006153587589079', 
-        seedId: '211006153587660079'   
+        propsId: '', 
+        seedId: ''   
     },
     // ==================================================================
 ];
 
 // --- 脚本核心逻辑 (以下部分无需修改) ---
 
-// Key for reading stored data
-const ddxq_headers_key = "ddxq_headers";
-const ddxq_url_key = "ddxq_url";
+const ddxq_session_key = "ddxq_session";
 const apiHost = 'https://farm.api.ddxq.mobi';
 
 // 统一API的通知函数
 const notify = (accountName, title, subtitle, body) => {
   const finalTitle = `[${accountName}] ${title}`;
-  if (typeof $notify !== 'undefined') { // Quantumult X or compatible
+  if (typeof $notify !== 'undefined') {
     $notify(finalTitle, subtitle, body);
-  } else if (typeof $notification !== 'undefined') { // Surge
+  } else if (typeof $notification !== 'undefined') {
     $notification.post(finalTitle, subtitle, body);
   } else {
-    console.log(`\n---\n${finalTitle}\n${subtitle}\n${body}\n---`);
+    console.log(`
+---
+${finalTitle}
+${subtitle}
+${body}
+---`);
   }
 };
 
 // 统一API的请求函数
 function sendRequest(options) {
     return new Promise((resolve, reject) => {
-        if (typeof $task !== 'undefined') { // Quantumult X
+        if (typeof $task !== 'undefined') {
             $task.fetch(options).then(response => {
-                if (response.statusCode >= 200 && response.statusCode < 300) {
-                    resolve(JSON.parse(response.body));
-                } else {
-                    reject(`HTTP Error: ${response.statusCode}`);
-                }
-            }, reason => {
-                reject(`Request Failed: ${reason.error}`);
-            });
-        } else if (typeof $httpClient !== 'undefined') { // Surge and potentially Shadowrocket
+                if (response.statusCode >= 200 && response.statusCode < 300) resolve(JSON.parse(response.body));
+                else reject(`HTTP Error: ${response.statusCode}`);
+            }, reason => reject(`Request Failed: ${reason.error}`));
+        } else if (typeof $httpClient !== 'undefined') {
             $httpClient.get(options, (error, response, data) => {
-                if (error) {
-                    reject(`Request Failed: ${error}`);
-                    return;
-                }
-                if (response.status >= 200 && response.status < 300) {
-                    resolve(JSON.parse(data));
-                } else {
-                    reject(`HTTP Error: ${response.status}`);
+                if (error) reject(`Request Failed: ${error}`);
+                else {
+                    if (response.status >= 200 && response.status < 300) resolve(JSON.parse(data));
+                    else reject(`HTTP Error: ${response.status}`);
                 }
             });
         } else {
-            console.error("Unsupported environment for network requests.");
             reject("Unsupported environment for network requests.");
         }
     });
@@ -116,14 +100,15 @@ function getURLParam(url, name) {
 // 加载和处理配置
 function processConfigs() {
     const processed = [];
-    const storedHeadersStr = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_headers_key) : null;
-    const storedUrl = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_url_key) : null;
+    const sessionStr = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_session_key) : null;
 
     for (const cfg of configs) {
         if (cfg.useStore) {
-            if (storedHeadersStr && storedUrl) {
+            if (sessionStr) {
                 console.log(`[${cfg.name}] 检测到已保存的会话信息, 将进行处理。`);
-                const storedHeaders = JSON.parse(storedHeadersStr);
+                const session = JSON.parse(sessionStr);
+                const storedHeaders = session.headers;
+                const storedUrl = session.url;
 
                 const getHeader = (key) => {
                     const headerKey = Object.keys(storedHeaders).find(h => h.toLowerCase() === key.toLowerCase());
@@ -141,6 +126,8 @@ function processConfigs() {
                     lat: getHeader('ddmc-latitude') || getURLParam(storedUrl, 'lat'),
                     lng: getHeader('ddmc-longitude') || getURLParam(storedUrl, 'lng'),
                     cityNumber: getHeader('ddmc-city-number') || getURLParam(storedUrl, 'city_number'),
+                    propsId: session.propsId, // 从session中自动获取
+                    seedId: session.seedId,   // 从session中自动获取
                 };
                 processed.push(newConfig);
             } else {
@@ -174,45 +161,32 @@ async function executeTask(taskFn, taskName, config, headers) {
 async function dailySign(config, headers) {
     const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=DAILY_SIGN`;
     const data = await sendRequest({ url, headers });
-    if (data.success && data.data.rewards && data.data.rewards.length > 0) {
-        return `✅ 每日签到成功, 获得${data.data.rewards[0].amount}g饲料`;
-    } else if (data.code === 2002 || (data.msg && data.msg.includes("已完成"))) {
-        return `ℹ️ 每日签到: 今日已签,无需重复`;
-    }
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) return `✅ 每日签到成功, 获得${data.data.rewards[0].amount}g饲料`;
+    if (data.code === 2002 || (data.msg && data.msg.includes("已完成"))) return `ℹ️ 每日签到: 今日已签,无需重复`;
     return `❌ 每日签到失败: ${data.msg || '未知错误'}`;
 }
 
 async function continuousSign(config, headers) {
     const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=CONTINUOUS_SIGN`;
     const data = await sendRequest({ url, headers });
-    if (data.success && data.data.rewards && data.data.rewards.length > 0) {
-        return `✅ 连续签到成功, 获得${data.data.rewards[0].amount}g饲料`;
-    } else if (data.code === 2002 || (data.msg && data.msg.includes("已完成"))) {
-        return `ℹ️ 连续签到: 今日已签,无需重复`;
-    }
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) return `✅ 连续签到成功, 获得${data.data.rewards[0].amount}g饲料`;
+    if (data.code === 2002 || (data.msg && data.msg.includes("已完成"))) return `ℹ️ 连续签到: 今日已签,无需重复`;
     return `❌ 连续签到失败: ${data.msg || '未知错误'}`;
 }
 
 async function claimQuizReward(config, headers) {
-    const missionId = "7385", missionInstanceId = "558400", examSerialNo = "5000006200094";
-    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&missionId=${missionId}&missionInstanceId=${missionInstanceId}&examSerialNo=${examSerialNo}&taskCode=QUIZ1`;
+    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&missionId=7385&missionInstanceId=558400&examSerialNo=5000006200094&taskCode=QUIZ1`;
     const data = await sendRequest({ url, headers });
-    if (data.success && data.data.rewards && data.data.rewards.length > 0) {
-        return `✅ 答题奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
-    } else if (data.msg && (data.msg.includes("已领取") || data.msg.includes("已完成"))) {
-        return `ℹ️ 答题奖励: ${data.msg || '今日已领取'}`;
-    }
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) return `✅ 答题奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
+    if (data.msg && (data.msg.includes("已领取") || data.msg.includes("已完成"))) return `ℹ️ 答题奖励: ${data.msg}`;
     return `❌ 答题奖励领取失败: ${data.msg || '未知错误'}`;
 }
 
 async function claimLotteryReward(config, headers) {
     const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=LOTTERY`;
     const data = await sendRequest({ url, headers });
-    if (data.success && data.data.rewards && data.data.rewards.length > 0) {
-        return `✅ 三餐福袋领取成功, 获得${data.data.rewards[0].amount}g饲料`;
-    } else if (data.code === 2002 || (data.msg && data.msg.includes("不在活动时间")) || (data.msg && data.msg.includes("已完成"))) {
-        return `ℹ️ 三餐福袋: ${data.msg || '今日已完成/不在活动时间'}`;
-    }
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) return `✅ 三餐福袋领取成功, 获得${data.data.rewards[0].amount}g饲料`;
+    if (data.code === 2002 || (data.msg && (data.msg.includes("不在活动时间") || data.msg.includes("已完成")))) return `ℹ️ 三餐福袋: ${data.msg || '今日已完成/不在活动时间'}`;
     return `❌ 三餐福袋领取失败: ${data.msg || '未知错误'}`;
 }
 
@@ -220,53 +194,36 @@ async function fetchTaskList(config, headers) {
     const url = `${apiHost}/api/v2/task/list?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1`;
     try {
         const data = await sendRequest({ url, headers });
-        if (data.success && data.data && data.data.userTasks) {
-            return data.data.userTasks;
-        }
-    } catch (error) {
-        console.log(`[${config.name}] 获取任务列表异常: ${error}`);
-        return [];
-    }
+        if (data.success && data.data && data.data.userTasks) return data.data.userTasks;
+    } catch (e) { console.log(`[${config.name}] 获取任务列表异常: ${e}`); }
+    return [];
 }
 
 async function claimAnyOrderReward(config, headers) {
     const taskList = await fetchTaskList(config, headers);
     const anyOrderTask = taskList.find(task => task.taskCode === "ANY_ORDER");
-    if (anyOrderTask && anyOrderTask.userTaskLogId) {
-        const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&userTaskLogId=${anyOrderTask.userTaskLogId}`;
-        const data = await sendRequest({ url, headers });
-        if (data.success && data.data.rewards && data.data.rewards.length > 0) {
-            return `✅ 任意下单奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
-        } else if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) {
-            return `ℹ️ 任意下单奖励: ${data.msg || '今日已领取'}`;
-        }
-        return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
-    }
-    return `ℹ️ 任意下单任务: 未在任务列表中找到`;
+    if (!anyOrderTask || !anyOrderTask.userTaskLogId) return `ℹ️ 任意下单任务: 未在任务列表中找到`;
+    
+    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&userTaskLogId=${anyOrderTask.userTaskLogId}`;
+    const data = await sendRequest({ url, headers });
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) return `✅ 任意下单奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
+    if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) return `ℹ️ 任意下单奖励: ${data.msg || '今日已领取'}`;
+    return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
 }
 
 async function feed(config, headers) {
     let successCount = 0;
     const maxFeeds = 20;
     let finalMsg = "未开始喂食或饲料不足";
-    if (!config.propsId || !config.seedId) {
-        return "ℹ️ 未配置喂食ID (propsId/seedId), 跳过喂食";
-    }
+    if (!config.propsId || !config.seedId) return "ℹ️ 未配置喂食ID (propsId/seedId), 跳过喂食";
+    
     for (let i = 0; i < maxFeeds; i++) {
         const url = `${apiHost}/api/v2/props/feed?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&propsId=${config.propsId}&seedId=${config.seedId}&triggerMultiFeed=0`;
         try {
             const data = await sendRequest({ url, headers });
-            if (data.success) {
-                successCount++;
-                finalMsg = data.data.msg;
-            } else {
-                finalMsg = data.msg;
-                break;
-            }
-        } catch (error) {
-            finalMsg = `❌ 喂食异常: ${error}`;
-            break;
-        }
+            if (data.success) { successCount++; finalMsg = data.data.msg; } 
+            else { finalMsg = data.msg; break; }
+        } catch (e) { finalMsg = `❌ 喂食异常: ${e}`; break; }
         if (i < maxFeeds - 1) await new Promise(resolve => setTimeout(resolve, 2000));
     }
     return successCount > 0 ? `✅ 成功喂食 ${successCount} 次。提示: ${finalMsg}` : `ℹ️ 未执行喂食或失败: ${finalMsg}`;
@@ -285,7 +242,8 @@ async function feed(config, headers) {
 
     for (let i = 0; i < accountsToRun.length; i++) {
         const config = accountsToRun[i];
-        console.log(`\n=============== 开始为账号 [${config.name}] 执行任务 ===============`);
+        console.log(`
+=============== 开始为账号 [${config.name}] 执行任务 ===============`);
 
         if (!config.cookie || !config.userAgent) {
             console.log(`[${config.name}] 配置不完整 (缺少cookie或userAgent), 跳过。`);
@@ -294,20 +252,11 @@ async function feed(config, headers) {
         }
 
         const commonHeaders = {
-            'Host': 'farm.api.ddxq.mobi',
-            'Cookie': config.cookie,
-            'User-Agent': config.userAgent,
-            'ddmc-device-token': config.deviceToken,
-            'ddmc-station-id': config.stationId,
-            'ddmc-uid': config.uid,
-            'ddmc-device-id': config.deviceId,
-            'ddmc-latitude': config.lat,
-            'ddmc-longitude': config.lng,
-            'ddmc-city-number': config.cityNumber,
-            'ddmc-api-version': '9.1.0',
-            'ddmc-app-client-id': '1',
-            'Origin': 'https://game.m.ddxq.mobi',
-            'Referer': 'https://game.m.ddxq.mobi/',
+            'Host': 'farm.api.ddxq.mobi', 'Cookie': config.cookie, 'User-Agent': config.userAgent,
+            'ddmc-device-token': config.deviceToken, 'ddmc-station-id': config.stationId, 'ddmc-uid': config.uid,
+            'ddmc-device-id': config.deviceId, 'ddmc-latitude': config.lat, 'ddmc-longitude': config.lng,
+            'ddmc-city-number': config.cityNumber, 'ddmc-api-version': '9.1.0', 'ddmc-app-client-id': '1',
+            'Origin': 'https://game.m.ddxq.mobi', 'Referer': 'https://game.m.ddxq.mobi/',
         };
 
         const results = [];
@@ -324,7 +273,9 @@ async function feed(config, headers) {
         console.log(`=============== 账号 [${config.name}] 任务执行完毕 ===============`);
         
         if (i < accountsToRun.length - 1) {
-            console.log(`\n等待5秒后处理下一个账号...\n`);
+            console.log(`
+等待5秒后处理下一个账号...
+`);
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
     }
