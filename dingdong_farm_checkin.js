@@ -2,72 +2,95 @@
  * 叮咚农场自动任务 (签到 + 喂食)
  * 兼容 Quantumult X (小火箭) 和 Surge
  *
- * 最后更新: 2026-02-01
+ * 最后更新: 2026-02-02
  *
- * 使用方法:
- * 1. 将此脚本文件放到 小火箭(Quantumult X) 或 Surge 的脚本目录中。
- * 2. 在小火箭[task_local] 中配置多个任务, 使用 argument 参数区分不同账号。
- *    例如:
- *    30 7,10,16 * * * dingdong_farm_checkin.js, argument=account1, tag=叮咚农场-账号1
- *    35 7,10,16 * * * dingdong_farm_checkin.js, argument=account2, tag=叮咚农场-账号2
- *
- * 注意:
- * 脚本中的 Cookie 和其他身份验证信息可能需要定期更新。
- * 如果脚本失效, 请自行抓包替换 allConfigs 中的个人信息。
+ * 此版本已修改为自动读取由 ddxq_header_catcher.js 捕获的信息。
+ * 当脚本提示Cookie失效时, 请打开叮咚买菜App, 进入农场页面一次,
+ * 脚本所需信息便会自动更新。
  */
 
 // --- 配置区 ---
-// 在这里添加您所有的账号信息
-const allConfigs = {
-    'account1': {
-        name: "默认账号",
-        cookie: 'DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/d53e701967a6e12aeb3905856bbb10913ec2442c relaunchId/5CC59B02-23E0-4173-801A-5EF1BFB58C6E',
-        deviceToken: 'BMjsMHb5cUncPBW1zO0jKTOEQeA7Lc7pseTHdZFdFek6bKnzYx6mpWtvTueU+UWKquJo5ssIkJlldFf0oFbU4yw==',
-        stationId: '611cd49cb5871d00015f5956',
-        uid: '5c70ab5955af540f2c79ab4f',
-        deviceId: 'd53e701967a6e12aeb3905856bbb10913ec2442c',
-        lat: '30.272027',
-        lng: '119.941419',
-        propsId: '211006153587589079',
-        seedId: '211006153587660079',
-        agbp: 'application/json, text/plain, */*',
-        cityNumber: '0901'
-    },
-    'account2': {
-        name: "Lau的账号",
-        cookie: 'DDXQSESSID=g1906v4uv4ddu5934v0949dv096v968gql8xz06gg9duvge88ysz43o2qk6hzy07',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/8e0c9e96aaec7e80497b235048b93a7f236eca9b relaunchId/BC1881F9-0782-43D4-8840-DBC8BB623017',
-        deviceToken: 'BLSfmhYcct0xbW9IGy3mrIe0k8zd+j04cj+AZYoKVJcOUF/4JtNl9+3iQvooQk+4/0f3ZK7pf/1EjQgURW3iCaQ==',
-        stationId: '611cd49cb5871d00015f5956',
-        uid: '5c8477e1dc92d018368ec747',
-        deviceId: '8e0c9e96aaec7e80497b235048b93a7f236eca9b',
-        lat: '30.272027',
-        lng: '119.941419',
-        propsId: '260201188207600071',
-        seedId: '260201188212355071',
-        agbp: 'application/json, text/plain, */*',
-        cityNumber: '0901'
-    }
+// Key for reading stored data
+const ddxq_headers_key = "ddxq_headers";
+const ddxq_url_key = "ddxq_url";
+
+// 备用配置, 仅在从未成功抓取过信息时使用。
+// 您可以把您一个账号的信息填在这里作为备份。
+const fallbackConfig = {
+    name: "备用账号",
+    cookie: 'DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548',
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/d53e701967a6e12aeb3905856bbb10913ec2442c',
+    // 喂食所需的 propsId 和 seedId 通常比较固定, 建议从旧脚本复制过来填好
+    propsId: '211006153587589079',
+    seedId: '211006153587660079'
 };
 
-// --- 账号选择逻辑 ---
-let checkinConfig;
-const defaultAccountKey = 'account1'; // 设置一个默认账号的key
+// --- 核心加载逻辑 ---
+let checkinConfig = {};
+let accountName = "叮咚账号";
 
-if (typeof $argument !== 'undefined' && allConfigs[$argument]) {
-    // 如果传入了参数 (例如 'account1', 'account2')，并且在 allConfigs 中能找到对应的账号
-    checkinConfig = allConfigs[$argument];
-    console.log(`参数匹配成功，本次运行账号: 【${checkinConfig.name || $argument}】`);
-} else {
-    // 如果没有传入参数或参数无效，则使用默认账号
-    checkinConfig = allConfigs[defaultAccountKey];
-    console.log(`未提供有效账号参数，使用默认账号: 【${checkinConfig.name || defaultAccountKey}】`);
+// 从URL中提取参数的辅助函数
+function getURLParam(url, name) {
+    if (!url) return null;
+    const reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)");
+    const match = url.substr(url.indexOf("?") + 1).match(reg);
+    if (match) return decodeURIComponent(match[2]);
+    return null;
 }
-// --- 配置区结束 ---
+
+// 加载配置的主函数
+function loadConfig() {
+    const storedHeadersStr = typeof $prefs !== 'undefined' ? $prefs.valueForKey(ddxq_headers_key) : null;
+    const storedUrl = typeof $prefs !== 'undefined' ? $prefs.valueForKey(ddxq_url_key) : null;
+
+    if (storedHeadersStr && storedUrl) {
+        console.log("检测到已保存的会话信息, 将优先使用。");
+        const storedHeaders = JSON.parse(storedHeadersStr);
+
+        // 编写一个辅助函数, 用于不区分大小写地获取请求头
+        const getHeader = (key) => {
+            const headerKey = Object.keys(storedHeaders).find(h => h.toLowerCase() === key.toLowerCase());
+            return headerKey ? storedHeaders[headerKey] : null;
+        };
+
+        // 从URL和请求头中组装配置
+        checkinConfig = {
+            name: accountName,
+            cookie: getHeader('cookie'),
+            userAgent: getHeader('user-agent'),
+            deviceToken: getHeader('ddmc-device-token') || getURLParam(storedUrl, 'device_token'),
+            stationId: getHeader('ddmc-station-id') || getURLParam(storedUrl, 'station_id'),
+            uid: getHeader('ddmc-uid') || getURLParam(storedUrl, 'uid'),
+            deviceId: getHeader('ddmc-device-id') || getURLParam(storedUrl, 'DeviceId'),
+            lat: getHeader('ddmc-latitude') || getURLParam(storedUrl, 'lat'),
+            lng: getHeader('ddmc-longitude') || getURLParam(storedUrl, 'lng'),
+            cityNumber: getHeader('ddmc-city-number') || getURLParam(storedUrl, 'city_number'),
+            propsId: fallbackConfig.propsId, // 喂食ID使用备用配置
+            seedId: fallbackConfig.seedId,   // 种子ID使用备用配置
+        };
+        
+        // 检查关键信息是否存在
+        if (!checkinConfig.cookie) {
+            console.log("已保存的信息不完整 (缺少Cookie), 转为使用备用配置。");
+            checkinConfig = fallbackConfig;
+            accountName = fallbackConfig.name;
+        }
+
+    } else {
+        console.log("未检测到已保存的会话信息, 将使用脚本内的备用配置。");
+        checkinConfig = fallbackConfig;
+        accountName = fallbackConfig.name;
+    }
+}
+
+// --- 后面是和原来一样的签到业务逻辑, 无需关心 ---
+
+// 脚本开始运行时加载配置
+loadConfig();
 
 const apiHost = 'https://farm.api.ddxq.mobi';
 
+// 根据加载的配置生成通用请求头
 const commonHeaders = {
     'Host': 'farm.api.ddxq.mobi',
     'Cookie': checkinConfig.cookie,
@@ -85,11 +108,9 @@ const commonHeaders = {
     'Referer': 'https://game.m.ddxq.mobi/',
 };
 
-// --- 核心函数, 请勿修改 ---
-
+// ... (The rest of the script is the same as the original) ...
 // 统一API的通知函数
 const notify = (title, subtitle, body) => {
-  const accountName = checkinConfig.name || '';
   const finalTitle = `[${accountName}] ${title}`;
   if (typeof $task !== 'undefined') {
     $notify(finalTitle, subtitle, body);
@@ -101,25 +122,20 @@ const notify = (title, subtitle, body) => {
 // 统一API的请求函数
 function sendRequest(options) {
     return new Promise((resolve, reject) => {
-        if (typeof $task !== 'undefined') {
-            // Quantumult X 环境
+        const env = typeof $task !== 'undefined' ? 'Quantumult X' : (typeof $httpClient !== 'undefined' ? 'Surge' : 'unknown');
+
+        if (env === 'Quantumult X') {
             $task.fetch(options).then(response => {
                 if (response.statusCode >= 200 && response.statusCode < 300) {
                     resolve(JSON.parse(response.body));
                 } else {
                     reject(`HTTP Error: ${response.statusCode}`);
                 }
-            }).catch(reason => {
+            }, reason => {
                 reject(`Request Failed: ${reason.error}`);
             });
-        } else if (typeof $httpClient !== 'undefined') {
-            // Surge 环境
-            const requestOptions = {
-                url: options.url,
-                headers: options.headers,
-                body: options.body
-            };
-            $httpClient.get(requestOptions, (error, response, data) => {
+        } else if (env === 'Surge') {
+            $httpClient.get(options, (error, response, data) => {
                 if (error) {
                     reject(`Request Failed: ${error}`);
                     return;
@@ -131,20 +147,18 @@ function sendRequest(options) {
                 }
             });
         } else {
-            reject("Unsupported environment: $task and $httpClient are not defined.");
+            reject("Unsupported environment.");
         }
     });
 }
 
-// 统一API的脚本结束函数
 const done = () => {
     if (typeof $done !== 'undefined') {
         $done();
     }
 };
 
-// --- 业务逻辑函数 ---
-
+// 业务逻辑函数...
 // 每日签到
 async function dailySign() {
     const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&taskCode=DAILY_SIGN`;
@@ -187,8 +201,6 @@ async function continuousSign() {
 
 // 领取答题奖励 (使用固定ID)
 async function claimQuizReward() {
-    // 注意: 这里的 missionId, missionInstanceId, examSerialNo 是固定的
-    // 如果答题任务是动态的, 此功能可能会在第二天失效
     const missionId = "7385";
     const missionInstanceId = "558400";
     const examSerialNo = "5000006200094";
@@ -259,7 +271,6 @@ async function claimAnyOrderReward() {
         const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&userTaskLogId=${anyOrderTask.userTaskLogId}`;
         try {
             const data = await sendRequest({ url, headers: commonHeaders });
-            console.log('任意下单奖励响应: ' + JSON.stringify(data));
             if (data.success && data.data.rewards && data.data.rewards.length > 0) {
                 const reward = data.data.rewards[0];
                 return `✅ 任意下单奖励领取成功, 获得${reward.amount}g饲料`;
@@ -269,19 +280,19 @@ async function claimAnyOrderReward() {
                 return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
             }
         } catch (error) {
-            console.log(`任意下单奖励领取异常: ${error}`);
             return `❌ 任意下单奖励领取异常: ${error}`;
         }
     } else {
-        return `ℹ️ 任意下单任务: 未在任务列表中找到或缺少userTaskLogId`;
+        return `ℹ️ 任意下单任务: 未在任务列表中找到`;
     }
 }
+
 
 // 喂食 (循环多次)
 async function feed() {
     let successCount = 0;
-    const maxFeeds = 20; // 为防止意外,设置一个最大喂食次数
-    let finalMsg = "未开始喂食或饲料不足"; // 默认消息
+    const maxFeeds = 20;
+    let finalMsg = "未开始喂食或饲料不足"; 
 
     for (let i = 0; i < maxFeeds; i++) {
         console.log(`尝试进行第 ${i + 1} 次喂食...`);
@@ -293,21 +304,19 @@ async function feed() {
 
             if (data.success) {
                 successCount++;
-                finalMsg = data.data.msg; // 保存最后一次成功的消息
+                finalMsg = data.data.msg;
             } else {
-                // 只要服务器返回任何错误, 就停止
                 console.log(`喂食因服务器返回错误而停止: ${data.msg}`);
-                finalMsg = data.msg; // 将错误信息作为最终消息
-                break; // 跳出循环
+                finalMsg = data.msg;
+                break;
             }
         } catch (error) {
             console.log(`喂食过程中发生网络或解析异常: ${error}`);
             finalMsg = `❌ 喂食异常: ${error}`;
-            break; // 发生异常, 跳出循环
+            break;
         }
 
-        // 喂食成功后, 延迟2秒, 避免请求过于频繁
-        if (i < maxFeeds - 1) { // 最后一次成功后不延迟
+        if (i < maxFeeds - 1) {
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
@@ -315,7 +324,6 @@ async function feed() {
     if (successCount > 0) {
         return `✅ 成功喂食 ${successCount} 次。最后提示: ${finalMsg}`;
     } else {
-        // 如果一次都未成功, 返回导致循环停止或未开始的消息
         return `ℹ️ 未执行喂食或失败: ${finalMsg}`;
     }
 }
@@ -323,22 +331,31 @@ async function feed() {
 
 // --- 主执行函数 ---
 (async () => {
+    // 检查配置是否加载成功
+    if (!checkinConfig.cookie) {
+        const errorMsg = "配置加载失败, 缺少关键信息(Cookie)。请先按说明手动进入一次农场页面以自动抓取配置";
+        console.log(errorMsg);
+        notify('叮咚农场任务失败', '', errorMsg);
+        done();
+        return;
+    }
+    
     try {
         console.log("开始执行叮咚农场任务...");
         const results = [];
 
-        results.push(await dailySign()); // 每日签到
-        results.push(await continuousSign()); // 连续签到
-        results.push(await claimQuizReward()); // 问卷
-        results.push(await claimLotteryReward()); // 三餐福袋
-        results.push(await claimAnyOrderReward()); // 任意下单
-        results.push(await feed()); // 喂鱼
+        results.push(await dailySign());
+        results.push(await continuousSign());
+        results.push(await claimQuizReward());
+        results.push(await claimLotteryReward());
+        results.push(await claimAnyOrderReward());
+        results.push(await feed());
 
         const summary = results.filter(res => res).join('\n');
         
         console.log("任务执行完毕。");
-
         notify('叮咚农场任务报告', '', summary);
+
     } catch (e) {
         console.log(`脚本执行出现异常: ${e}`);
         notify('叮咚农场脚本错误', '', `详情: ${e}`);
