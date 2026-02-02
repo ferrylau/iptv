@@ -338,8 +338,6 @@ async function fetchTaskList() {
     results.push(await feed());
 
     const summary = results.filter(res => res).join('\n');
-    // console.log("\n--- 任务总结 ---");
-    // console.log(summary);
     console.log("任务执行完毕。");
 
     notify('叮咚农场任务报告', '', summary);
