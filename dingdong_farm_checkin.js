@@ -229,7 +229,7 @@ async function feed(config, headers) {
     const accountsToRun = processConfigs();
     if (accountsToRun.length === 0) {
         console.log("没有找到有效的账号配置, 脚本结束。");
-        notify("叮咚农场", "无有效账号", "请检查脚本中的configs配置或确认是否已成功抓取主账号信息。");
+        notify("叮咚农场", "任务失败", "无有效账号", "请检查脚本中的configs配置或确认是否已成功抓取主账号信息。");
         return;
     }
 
@@ -242,7 +242,7 @@ async function feed(config, headers) {
 
         if (!config.cookie || !config.userAgent) {
             console.log(`[${config.name}] 配置不完整 (缺少cookie或userAgent), 跳过。`);
-            // notify(config.name, '配置不完整', '请检查脚本中的账号配置。');
+            notify(config.name, '配置不完整', '请检查脚本中的账号配置。', '');
             continue;
         }
 
@@ -263,14 +263,12 @@ async function feed(config, headers) {
         results.push(await executeTask(feed, "自动喂食", config, commonHeaders));
 
         const summary = results.filter(res => res).join('\n');
-        notify(config.name, '叮咚农场任务报告', summary);
+        notify(config.name, '叮咚农场任务报告', '', summary);
         
         console.log(`=============== 账号 [${config.name}] 任务执行完毕 ===============`);
         
         if (i < accountsToRun.length - 1) {
-            console.log(`
-等待5秒后处理下一个账号...
-`);
+            console.log(`等待5秒后处理下一个账号...`);
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
     }
