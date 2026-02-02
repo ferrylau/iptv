@@ -2,7 +2,7 @@
 #!author=ferrylau
 
 [Script]
-DD_Farm_Cookie = type=http-request,pattern=^https://farm\.api\.ddxq\.mobi/api/v2/props/feed,script-path=https://raw.githubusercontent.com/ferrylau/iptv/main/ddxq_header_catcher.js
+DD_Farm_Cookie = type=http-request,pattern=^https://farm\.api\.ddxq\.mobi/api/v2/userguide/detail,script-path=https://raw.githubusercontent.com/ferrylau/iptv/main/ddxq_header_catcher.js
 
 [MITM]
-hostname = farm.api.ddxq.mobi
+hostname = %APPEND% ,farm.api.ddxq.mobi
