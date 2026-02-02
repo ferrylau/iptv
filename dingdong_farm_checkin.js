@@ -58,13 +58,7 @@ const notify = (accountName, title, subtitle, body) => {
   } else if (typeof $notification !== 'undefined') {
     $notification.post(finalTitle, subtitle, body);
   } else {
-    console.log(`
----
-${finalTitle}
-${subtitle}
-${body}
----
-`);
+    console.log(`---${finalTitle}${subtitle}${body}---`);
   }
 };
 
@@ -248,7 +242,7 @@ async function feed(config, headers) {
 
         if (!config.cookie || !config.userAgent) {
             console.log(`[${config.name}] 配置不完整 (缺少cookie或userAgent), 跳过。`);
-            notify(config.name, '配置不完整', '请检查脚本中的账号配置。');
+            // notify(config.name, '配置不完整', '请检查脚本中的账号配置。');
             continue;
         }
 
