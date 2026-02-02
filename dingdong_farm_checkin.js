@@ -4,22 +4,19 @@
  *
  * 最后更新: 2026-02-02
  *
- * 此版本为简化版, 抓取脚本只负责获取请求头和URL。
- * 你需要在下方为所有账号(包括主账号), 手动填入喂食ID (propsId 和 seedId)。
+ * 此版本通过两个脚本配合, 实现主账号完全自动化。
+ * 1. 自动抓取: 主账号的所有信息 (包括喂食ID) 均会自动获取。
+ * 2. 手动配置: 你仍可以在 configs 数组中添加更多手动配置的账号。
  */
 
 // --- 多账号配置 ---
 const configs = [
     // ==================================================================
     // 账号一: 自动抓取 (主账号)
-    // 此配置会自动读取由抓取脚本保存的请求头和URL。
-    // 你需要在这里手动填写该账号的喂食ID。
+    // 此配置会自动读取所有信息, 无需任何手动填写。
     {
         name: "主账号 (自动抓取)",
         useStore: true,
-        // *** 请在这里手动填入主账号的喂食ID ***
-        propsId: '2602001188207600071', // 喂食道具ID, 从抓包获取
-        seedId: '260201188212355071'  // 种子ID, 从抓包获取
     },
 
     // ==================================================================
@@ -47,6 +44,8 @@ const configs = [
 
 const ddxq_headers_key = "ddxq_headers";
 const ddxq_url_key = "ddxq_url";
+const ddxq_props_id_key = "ddxq_props_id";
+const ddxq_seed_id_key = "ddxq_seed_id";
 const apiHost = 'https://farm.api.ddxq.mobi';
 
 // 统一API的通知函数
@@ -57,7 +56,12 @@ const notify = (accountName, title, subtitle, body) => {
   } else if (typeof $notification !== 'undefined') {
     $notification.post(finalTitle, subtitle, body);
   } else {
-    console.log(`---${finalTitle}${subtitle}${body}---`);
+    console.log(`
+---
+${finalTitle}
+${subtitle}
+${body}
+---`);
   }
 };
 
@@ -95,8 +99,13 @@ function getURLParam(url, name) {
 // 加载和处理配置
 function processConfigs() {
     const processed = [];
-    const storedHeadersStr = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_headers_key) : null;
-    const storedUrl = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_url_key) : null;
+    const p_store = typeof $persistentStore !== 'undefined' ? $persistentStore : null;
+    if (!p_store) return processed;
+
+    const storedHeadersStr = p_store.read(ddxq_headers_key);
+    const storedUrl = p_store.read(ddxq_url_key);
+    const storedPropsId = p_store.read(ddxq_props_id_key);
+    const storedSeedId = p_store.read(ddxq_seed_id_key);
 
     for (const cfg of configs) {
         if (cfg.useStore) {
@@ -120,16 +129,18 @@ function processConfigs() {
                     lat: getHeader('ddmc-latitude') || getURLParam(storedUrl, 'lat'),
                     lng: getHeader('ddmc-longitude') || getURLParam(storedUrl, 'lng'),
                     cityNumber: getHeader('ddmc-city-number') || getURLParam(storedUrl, 'city_number'),
+                    propsId: storedPropsId, // 自动获取
+                    seedId: storedSeedId,   // 自动获取
                 };
                 processed.push(newConfig);
             } else {
-                console.log(`[${cfg.name}] 配置为自动抓取, 但未找到已保存的信息, 跳过此账号。`);
+                console.log(`[${cfg.name}] 配置为自动抓取, 但未找到已保存的会话信息, 跳过。`);
             }
         } else {
              if (cfg.cookie && cfg.cookie !== '在此填入抓包获取的Cookie') {
                 processed.push(cfg);
             } else {
-                console.log(`[${cfg.name}] 配置为手动模式, 但未填写Cookie, 跳过此账号。`);
+                console.log(`[${cfg.name}] 手动账号配置不完整, 跳过。`);
             }
         }
     }
@@ -225,7 +236,7 @@ async function feed(config, headers) {
     const accountsToRun = processConfigs();
     if (accountsToRun.length === 0) {
         console.log("没有找到有效的账号配置, 脚本结束。");
-        notify("叮咚农场", "任务失败", "无有效账号", "请检查脚本中的configs配置或确认是否已成功抓取主账号信息。");
+        notify("叮咚农场", "无有效账号", "请确认是否已成功抓取主账号信息或手动填写了其他账号。");
         return;
     }
 
@@ -237,8 +248,7 @@ async function feed(config, headers) {
 =============== 开始为账号 [${config.name}] 执行任务 ===============`);
 
         if (!config.cookie || !config.userAgent) {
-            console.log(`[${config.name}] 配置不完整 (缺少cookie或userAgent), 跳过。`);
-            notify(config.name, '配置不完整', '请检查脚本中的账号配置。', '');
+            console.log(`[${config.name}] 配置不完整, 跳过。`);
             continue;
         }
 
