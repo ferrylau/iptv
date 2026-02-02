@@ -232,30 +232,49 @@ async function claimLotteryReward() {
     }
 }
 
-// 通用领奖函数，用于领取所有通过 userTaskLogId 领奖的任务
-async function claimAvailableRewards(taskList) {
-    const results = [];
-    const claimableTasks = taskList.filter(task =>
-        (task.buttonStatus === "TO_REWARD" || task.buttonStatus === "TO_RECEIVE") && task.userTaskLogId
-    );
+// 获取任务列表
+async function fetchTaskList() {
+    const url = `${apiHost}/api/v2/task/list?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1`;
+    try {
+        const data = await sendRequest({ url, headers: commonHeaders });
+        if (data.success && data.data && data.data.userTasks) {
+            return data.data.userTasks;
+        }
+         else {
+            console.log(`获取任务列表失败: ${data.msg || '未知错误'}`);
+            return [];
+        }
+    } catch (error) {
+        console.log(`获取任务列表异常: ${error}`);
+        return [];
+    }
+}
 
-    for (const task of claimableTasks) {
-        const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&userTaskLogId=${task.userTaskLogId}`;
+// 领取任意下单任务奖励
+async function claimAnyOrderReward() {
+    const taskList = await fetchTaskList();
+    const anyOrderTask = taskList.find(task => task.taskCode === "ANY_ORDER");
+
+    if (anyOrderTask && anyOrderTask.userTaskLogId) {
+        const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&userTaskLogId=${anyOrderTask.userTaskLogId}`;
         try {
             const data = await sendRequest({ url, headers: commonHeaders });
-            console.log(`[${task.taskName}] 奖励响应: ` + JSON.stringify(data));
+            console.log('任意下单奖励响应: ' + JSON.stringify(data));
             if (data.success && data.data.rewards && data.data.rewards.length > 0) {
                 const reward = data.data.rewards[0];
-                results.push(`✅ [${task.taskName}] 领取成功, 获得${reward.amount}g饲料`);
+                return `✅ 任意下单奖励领取成功, 获得${reward.amount}g饲料`;
+            } else if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) {
+                return `ℹ️ 任意下单奖励: ${data.msg || '今日已领取'}`;
             } else {
-                results.push(`ℹ️ [${task.taskName}]: ${data.msg || '无法领取'}`);
+                return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
             }
         } catch (error) {
-            console.log(`[${task.taskName}] 领取异常: ${error}`);
-            results.push(`❌ [${task.taskName}] 领取异常: ${error}`);
+            console.log(`任意下单奖励领取异常: ${error}`);
+            return `❌ 任意下单奖励领取异常: ${error}`;
         }
+    } else {
+        return `ℹ️ 任意下单任务: 未在任务列表中找到或缺少userTaskLogId`;
     }
-    return results;
 }
 
 // 喂食 (循环多次)
@@ -301,48 +320,29 @@ async function feed() {
     }
 }
 
-// 获取任务列表
-async function fetchTaskList() {
-    const url = `${apiHost}/api/v2/task/list?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1`;
-    try {
-        const data = await sendRequest({ url, headers: commonHeaders });
-        if (data.success && data.data && data.data.userTasks) {
-            return data.data.userTasks;
-        }
-         else {
-            console.log(`获取任务列表失败: ${data.msg || '未知错误'}`);
-            return [];
-        }
-    } catch (error) {
-        console.log(`获取任务列表异常: ${error}`);
-        return [];
-    }
-}
 
 // --- 主执行函数 ---
 (async () => {
-    console.log("开始执行叮咚农场任务...");
-    let results = [];
+    try {
+        console.log("开始执行叮咚农场任务...");
+        const results = [];
 
-    // 1. 执行“点击即完成”类型的任务
-    results.push(await dailySign());
-    results.push(await continuousSign());
-    results.push(await claimLotteryReward());
-    results.push(await claimQuizReward()); // 特殊领奖任务, 单独执行
+        results.push(await dailySign());
+        results.push(await continuousSign());
+        results.push(await claimQuizReward());
+        results.push(await claimLotteryReward());
+        results.push(await claimAnyOrderReward());
+        results.push(await feed());
 
-    // 2. 获取一次任务列表，用于后续所有需要列表的操作
-    const taskList = await fetchTaskList();
+        const summary = results.filter(res => res).join('\n');
+        
+        console.log("任务执行完毕。");
 
-    // 3. 调用通用领奖函数，一次性处理所有可领取的奖励
-    const claimResults = await claimAvailableRewards(taskList);
-    results = results.concat(claimResults);
-
-    // 4. 执行喂食
-    results.push(await feed());
-
-    const summary = results.filter(res => res).join('\n');
-    console.log("任务执行完毕。");
-
-    notify('叮咚农场任务报告', '', summary);
-    done();
+        notify('叮咚农场任务报告', '', summary);
+    } catch (e) {
+        console.log(`脚本执行出现异常: ${e}`);
+        notify('叮咚农场脚本错误', '', `详情: ${e}`);
+    } finally {
+        done();
+    }
 })();
