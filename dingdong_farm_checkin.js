@@ -23,23 +23,24 @@ const configs = [
     // 账号二: 手动配置 (示例)
     // 在这里填入你为别人手机抓包获取的信息。
     {
-        name: "朋友的账号 (手动)",
+        name: "yl",
         useStore: false,
-        cookie: '在此填入抓包获取的Cookie',
-        userAgent: '在此填入抓包获取的User-Agent',
+        cookie: 'DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/d53e701967a6e12aeb3905856bbb10913ec2442c relaunchId/B24B9A97-3A4B-4FBD-BA87-18C9F821CCE3',
         
         // --- 以下所有 ddmc- 开头的参数都需要从抓包数据中获取 ---
-        deviceToken: '', // ddmc-device-token
-        stationId: '',   // ddmc-station-id
-        uid: '',         // ddmc-uid
-        deviceId: '',    // ddmc-device-id
-        lat: '',         // ddmc-latitude
-        lng: '',         // ddmc-longitude
-        cityNumber: '',  // ddmc-city-number
+        // 你可以在请求头的 ddmc- 开头字段或URL参数中找到它们
+        deviceToken: 'BOmAJ4+wMEMav/3XWYarKlECOr25lzhlftlR1DmSyfvkHYzGwrCJ2/LeXwqPwJo1HPKq6BPFEz4Va+KyZr6edCw==', // ddmc-device-token
+        stationId: '611cd49cb5871d00015f5956',   // ddmc-station-id
+        uid: '5c70ab5955af540f2c79ab4f',         // ddmc-uid
+        deviceId: 'd53e701967a6e12aeb3905856bbb10913ec2442c',    // ddmc-device-id
+        lat: '30.272038',         // ddmc-latitude
+        lng: '119.941281',         // ddmc-longitude
+        cityNumber: '0901',  // ddmc-city-number
 
         // --- 喂食ID也需要单独从抓包中获取 ---
-        propsId: '', 
-        seedId: ''   
+        propsId: '211006153587589079', 
+        seedId: '211006153587660079'   
     },
     // ==================================================================
 ];
