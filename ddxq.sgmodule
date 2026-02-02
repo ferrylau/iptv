@@ -1,0 +1,8 @@
+#!name=获取叮咚cookie
+#!author=ferrylau
+
+[Script]
+叮咚农场Cookie = type=http-request,pattern=https://farm.api.ddxq.mobi/api/v2/userguide/detail,script-path=ddxq_header_catcher.js
+
+[MITM]
+hostname = %APPEND% , farm.api.ddxq.mobi
