@@ -193,6 +193,58 @@ async function continuousSign(config, headers) {
     return `❌ 连续签到失败: ${data.msg || '未知错误'}`;
 }
 
+async function claimQuizReward(config, headers) {
+    const missionId = "7385", missionInstanceId = "558400", examSerialNo = "5000006200094";
+    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&missionId=${missionId}&missionInstanceId=${missionInstanceId}&examSerialNo=${examSerialNo}&taskCode=QUIZ1`;
+    const data = await sendRequest({ url, headers });
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) {
+        return `✅ 答题奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
+    } else if (data.msg && (data.msg.includes("已领取") || data.msg.includes("已完成"))) {
+        return `ℹ️ 答题奖励: ${data.msg || '今日已领取'}`;
+    }
+    return `❌ 答题奖励领取失败: ${data.msg || '未知错误'}`;
+}
+
+async function claimLotteryReward(config, headers) {
+    const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=LOTTERY`;
+    const data = await sendRequest({ url, headers });
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) {
+        return `✅ 三餐福袋领取成功, 获得${data.data.rewards[0].amount}g饲料`;
+    } else if (data.code === 2002 || (data.msg && data.msg.includes("不在活动时间")) || (data.msg && data.msg.includes("已完成"))) {
+        return `ℹ️ 三餐福袋: ${data.msg || '今日已完成/不在活动时间'}`;
+    }
+    return `❌ 三餐福袋领取失败: ${data.msg || '未知错误'}`;
+}
+
+async function fetchTaskList(config, headers) {
+    const url = `${apiHost}/api/v2/task/list?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1`;
+    try {
+        const data = await sendRequest({ url, headers });
+        if (data.success && data.data && data.data.userTasks) {
+            return data.data.userTasks;
+        }
+    } catch (error) {
+        console.log(`[${config.name}] 获取任务列表异常: ${error}`);
+        return [];
+    }
+}
+
+async function claimAnyOrderReward(config, headers) {
+    const taskList = await fetchTaskList(config, headers);
+    const anyOrderTask = taskList.find(task => task.taskCode === "ANY_ORDER");
+    if (anyOrderTask && anyOrderTask.userTaskLogId) {
+        const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&userTaskLogId=${anyOrderTask.userTaskLogId}`;
+        const data = await sendRequest({ url, headers });
+        if (data.success && data.data.rewards && data.data.rewards.length > 0) {
+            return `✅ 任意下单奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
+        } else if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) {
+            return `ℹ️ 任意下单奖励: ${data.msg || '今日已领取'}`;
+        }
+        return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
+    }
+    return `ℹ️ 任意下单任务: 未在任务列表中找到`;
+}
+
 async function feed(config, headers) {
     let successCount = 0;
     const maxFeeds = 20;
@@ -261,6 +313,9 @@ async function feed(config, headers) {
         const results = [];
         results.push(await executeTask(dailySign, "每日签到", config, commonHeaders));
         results.push(await executeTask(continuousSign, "连续签到", config, commonHeaders));
+        results.push(await executeTask(claimQuizReward, "答题奖励", config, commonHeaders));
+        results.push(await executeTask(claimLotteryReward, "三餐福袋", config, commonHeaders));
+        results.push(await executeTask(claimAnyOrderReward, "任意下单奖励", config, commonHeaders));
         results.push(await executeTask(feed, "自动喂食", config, commonHeaders));
 
         const summary = results.filter(res => res).join('\n');
