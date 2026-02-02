@@ -9,7 +9,7 @@
  * 2. 添加一个定时任务 (cron) 来每天自动运行此脚本。
  *    - 小火箭: [task_local]
  *    - Surge:   [Script]
- *    例如: `30 7 * * * dingdong_farm_checkin.js, tag=叮咚农场任务`
+ *    例如: `30 7,10,16 * * * dingdong_farm_checkin.js, tag=叮咚农场任务`
  *
  * 注意:
  * 脚本中的 Cookie 和其他身份验证信息可能需要定期更新。
@@ -230,32 +230,30 @@ async function claimLotteryReward() {
     }
 }
 
-// 领取任意下单任务奖励
-async function claimAnyOrderReward() {
-    const taskList = await fetchTaskList();
-    const anyOrderTask = taskList.find(task => task.taskCode === "ANY_ORDER");
+// 通用领奖函数，用于领取所有通过 userTaskLogId 领奖的任务
+async function claimAvailableRewards(taskList) {
+    const results = [];
+    const claimableTasks = taskList.filter(task =>
+        (task.buttonStatus === "TO_REWARD" || task.buttonStatus === "TO_RECEIVE") && task.userTaskLogId
+    );
 
-    if (anyOrderTask && anyOrderTask.userTaskLogId) {
-        const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&userTaskLogId=${anyOrderTask.userTaskLogId}`;
+    for (const task of claimableTasks) {
+        const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&userTaskLogId=${task.userTaskLogId}`;
         try {
             const data = await sendRequest({ url, headers: commonHeaders });
-            console.log('任意下单奖励响应: ' + JSON.stringify(data));
+            console.log(`[${task.taskName}] 奖励响应: ` + JSON.stringify(data));
             if (data.success && data.data.rewards && data.data.rewards.length > 0) {
                 const reward = data.data.rewards[0];
-                return `✅ 任意下单奖励领取成功, 获得${reward.amount}g饲料`;
-            } else if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) {
-                return `ℹ️ 任意下单奖励: ${data.msg || '今日已领取'}`;
+                results.push(`✅ [${task.taskName}] 领取成功, 获得${reward.amount}g饲料`);
             } else {
-                // 对于其他所有非成功状态，都返回服务器的原始消息
-                return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
+                results.push(`ℹ️ [${task.taskName}]: ${data.msg || '无法领取'}`);
             }
         } catch (error) {
-            console.log(`任意下单奖励领取异常: ${error}`);
-            return `❌ 任意下单奖励领取异常: ${error}`;
+            console.log(`[${task.taskName}] 领取异常: ${error}`);
+            results.push(`❌ [${task.taskName}] 领取异常: ${error}`);
         }
-    } else {
-        return `ℹ️ 任意下单任务: 未在任务列表中找到或缺少userTaskLogId`;
     }
+    return results;
 }
 
 // 喂食 (循环多次)
@@ -321,40 +319,29 @@ async function fetchTaskList() {
 // --- 主执行函数 ---
 (async () => {
     console.log("开始执行叮咚农场任务...");
-    const results = [];
+    let results = [];
 
-    const signResult = await dailySign();
-    results.push(signResult);
-    console.log(signResult);
+    // 1. 执行“点击即完成”类型的任务
+    results.push(await dailySign());
+    results.push(await continuousSign());
+    results.push(await claimLotteryReward());
+    results.push(await claimQuizReward()); // 特殊领奖任务, 单独执行
 
-    const continuousSignResult = await continuousSign();
-    results.push(continuousSignResult);
-    console.log(continuousSignResult);
+    // 2. 获取一次任务列表，用于后续所有需要列表的操作
+    const taskList = await fetchTaskList();
 
-    const quizResult = await claimQuizReward();
-    results.push(quizResult);
-    console.log(quizResult);
+    // 3. 调用通用领奖函数，一次性处理所有可领取的奖励
+    const claimResults = await claimAvailableRewards(taskList);
+    results = results.concat(claimResults);
 
-    const lotteryResult = await claimLotteryReward();
-    results.push(lotteryResult);
-    console.log(lotteryResult);
+    // 4. 执行喂食
+    results.push(await feed());
 
-    const anyOrderResult = await claimAnyOrderReward();
-    results.push(anyOrderResult);
-    console.log(anyOrderResult);
-    
-    const feedResult = await feed();
-    results.push(feedResult);
-    console.log(feedResult);
-
-    // // 获取并打印任务列表
-    // console.log("\n--- 任务列表 ---");
-    // const taskList = await fetchTaskList();
-    // console.log(JSON.stringify(taskList, null, 2));
-    
-    const summary = results.join('\n');
+    const summary = results.filter(res => res).join('\n');
+    console.log("\n--- 任务总结 ---");
+    console.log(summary);
     console.log("任务执行完毕。");
-    
-    notify('叮咚农场任务报告', ' ', summary);
+
+    notify('叮咚农场任务报告', '', summary);
     done();
 })();
