@@ -40,8 +40,8 @@ function getURLParam(url, name) {
 
 // 加载配置的主函数
 function loadConfig() {
-    const storedHeadersStr = typeof $prefs !== 'undefined' ? $prefs.valueForKey(ddxq_headers_key) : null;
-    const storedUrl = typeof $prefs !== 'undefined' ? $prefs.valueForKey(ddxq_url_key) : null;
+    const storedHeadersStr = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_headers_key) : null;
+    const storedUrl = typeof $persistentStore !== 'undefined' ? $persistentStore.read(ddxq_url_key) : null;
 
     if (storedHeadersStr && storedUrl) {
         console.log("检测到已保存的会话信息, 将优先使用。");
