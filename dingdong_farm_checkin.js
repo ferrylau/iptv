@@ -210,6 +210,27 @@ async function claimQuizReward() {
     }
 }
 
+// 领取通用任务奖励 (通过 userTaskLogId)
+async function claimRewardByLogId(userTaskLogId, taskName) {
+    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&userTaskLogId=${userTaskLogId}`;
+
+    try {
+        const data = await sendRequest({ url, headers: commonHeaders });
+        console.log(`${taskName}奖励响应: ` + JSON.stringify(data));
+        if (data.success && data.data.rewards && data.data.rewards.length > 0) {
+            const reward = data.data.rewards[0];
+            return `✅ ${taskName}奖励领取成功, 获得${reward.amount}g饲料`;
+        } else if (data.data && data.data.taskStatus === "REWARDED") {
+            return `ℹ️ ${taskName}奖励: 今日已领取,无需重复`;
+        } else {
+            return `❌ ${taskName}奖励领取失败: ${data.msg || '未知错误'}`;
+        }
+    } catch (error) {
+        console.log(`${taskName}奖励领取异常: ${error}`);
+        return `❌ ${taskName}奖励领取异常: ${error}`;
+    }
+}
+
 // 喂食 (循环多次)
 async function feed() {
     let successCount = 0;
@@ -253,23 +274,63 @@ async function feed() {
     }
 }
 
+// 获取任务列表
+async function fetchTaskList() {
+    const url = `${apiHost}/api/v2/task/list?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1`; // 简化URL，移除了部分重复和不必要的参数
+    try {
+        const data = await sendRequest({ url, headers: commonHeaders });
+        if (data.success && data.data && data.data.userTasks) {
+            return data.data.userTasks;
+        } else {
+            console.log(`获取任务列表失败: ${data.msg || '未知错误'}`);
+            return [];
+        }
+    } catch (error) {
+        console.log(`获取任务列表异常: ${error}`);
+        return [];
+    }
+}
+
 // --- 主执行函数 ---
 (async () => {
     console.log("开始执行叮咚农场任务...");
     const results = [];
 
+    // 每日签到
     const signResult = await dailySign();
     results.push(signResult);
     console.log(signResult);
 
+    // 连续签到
     const continuousSignResult = await continuousSign();
     results.push(continuousSignResult);
     console.log(continuousSignResult);
 
+    // 领取答题奖励
     const quizResult = await claimQuizReward();
     results.push(quizResult);
     console.log(quizResult);
 
+    // 获取任务列表并尝试领取通用奖励
+    console.log("正在获取任务列表并尝试领取通用奖励...");
+    const userTasks = await fetchTaskList();
+    for (const task of userTasks) {
+        // 针对 HARD_BOX (饲料收集器) 特殊处理：当状态为 WAITING_REWARD 且有 userTaskLogId 时，尝试领取
+        // 注意：这里没有检查 hardBoxCanRewardTime，如果未到时间，API可能会返回失败
+        if (task.taskCode === "HARD_BOX" && task.buttonStatus === "WAITING_REWARD" && task.userTaskLogId) {
+            // const claimResult = await claimRewardByLogId(task.userTaskLogId, task.taskName);
+            // results.push(claimResult);
+            // console.log(claimResult);
+        }  
+
+        if ((task.buttonStatus === "TO_REWARD" || task.buttonStatus === "TO_RECEIVE") && task.userTaskLogId) {
+            const claimResult = await claimRewardByLogId(task.userTaskLogId, task.taskName);
+            results.push(claimResult);
+            console.log(claimResult);
+        }        
+    }
+
+    // 喂食
     const feedResult = await feed();
     results.push(feedResult);
     console.log(feedResult);
