@@ -243,8 +243,7 @@ async function feed(config, headers) {
 
     for (let i = 0; i < accountsToRun.length; i++) {
         const config = accountsToRun[i];
-        console.log(`
-=============== 开始为账号 [${config.name}] 执行任务 ===============`);
+        console.log(`=============== 开始为账号 [${config.name}] 执行任务 ===============`);
 
         if (!config.cookie || !config.userAgent) {
             console.log(`[${config.name}] 配置不完整 (缺少cookie或userAgent), 跳过。`);
@@ -274,9 +273,7 @@ async function feed(config, headers) {
         console.log(`=============== 账号 [${config.name}] 任务执行完毕 ===============`);
         
         if (i < accountsToRun.length - 1) {
-            console.log(`
-等待5秒后处理下一个账号...
-`);
+            console.log(`等待5秒后处理下一个账号...`);
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
     }
