@@ -235,7 +235,7 @@ async function claimAnyOrderReward() {
     const taskList = await fetchTaskList();
     const anyOrderTask = taskList.find(task => task.taskCode === "ANY_ORDER");
 
-    if (anyOrderTask && (anyOrderTask.buttonStatus === "TO_REWARD" || anyOrderTask.buttonStatus === "TO_RECEIVE") && anyOrderTask.userTaskLogId) {
+    if (anyOrderTask && anyOrderTask.userTaskLogId) {
         const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&userTaskLogId=${anyOrderTask.userTaskLogId}`;
         try {
             const data = await sendRequest({ url, headers: commonHeaders });
@@ -243,17 +243,18 @@ async function claimAnyOrderReward() {
             if (data.success && data.data.rewards && data.data.rewards.length > 0) {
                 const reward = data.data.rewards[0];
                 return `✅ 任意下单奖励领取成功, 获得${reward.amount}g饲料`;
-            } else if (data.data && data.data.taskStatus === "REWARDED") {
-                return `ℹ️ 任意下单奖励: 今日已领取`;
+            } else if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) {
+                return `ℹ️ 任意下单奖励: ${data.msg || '今日已领取'}`;
             } else {
-                return `❌ 任意下单奖励领取失败: ${data.msg || '未知错误'}`;
+                // 对于其他所有非成功状态，都返回服务器的原始消息
+                return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
             }
         } catch (error) {
             console.log(`任意下单奖励领取异常: ${error}`);
             return `❌ 任意下单奖励领取异常: ${error}`;
         }
     } else {
-        return `ℹ️ 任意下单任务: 未发现可领取的奖励`;
+        return `ℹ️ 任意下单任务: 未在任务列表中找到或缺少userTaskLogId`;
     }
 }
 
