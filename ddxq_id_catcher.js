@@ -20,7 +20,7 @@ const notify = (title, subtitle, body) => {
   }
 };
 
-if ($response && $response.body && $request.url.includes('/api/v2/userguide/detail')) {
+if ($response && $response.body) {
     if ($response.statusCode !== 200) {
         notify("抓取失败", "❌", `服务器响应码: ${$response.statusCode}`);
         $done();
