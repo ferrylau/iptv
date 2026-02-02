@@ -112,19 +112,19 @@ const commonHeaders = {
 // 统一API的通知函数
 const notify = (title, subtitle, body) => {
   const finalTitle = `[${accountName}] ${title}`;
-  if (typeof $task !== 'undefined') {
+  if (typeof $notify !== 'undefined') { // Quantumult X
     $notify(finalTitle, subtitle, body);
-  } else if (typeof $httpClient !== 'undefined') {
+  } else if (typeof $notification !== 'undefined') { // Surge
     $notification.post(finalTitle, subtitle, body);
+  } else {
+    console.log(`${finalTitle}\n${subtitle}\n${body}`); // Fallback for other environments
   }
 };
 
 // 统一API的请求函数
 function sendRequest(options) {
     return new Promise((resolve, reject) => {
-        const env = typeof $task !== 'undefined' ? 'Quantumult X' : (typeof $httpClient !== 'undefined' ? 'Surge' : 'unknown');
-
-        if (env === 'Quantumult X') {
+        if (typeof $task !== 'undefined') { // Quantumult X
             $task.fetch(options).then(response => {
                 if (response.statusCode >= 200 && response.statusCode < 300) {
                     resolve(JSON.parse(response.body));
@@ -134,20 +134,24 @@ function sendRequest(options) {
             }, reason => {
                 reject(`Request Failed: ${reason.error}`);
             });
-        } else if (env === 'Surge') {
+        } else if (typeof $httpClient !== 'undefined') { // Surge and potentially Shadowrocket
             $httpClient.get(options, (error, response, data) => {
                 if (error) {
                     reject(`Request Failed: ${error}`);
                     return;
                 }
+                // Surge's $httpClient.get response structure has status and body directly
+                // Assuming Shadowrocket's $httpClient (if exists) might be similar
                 if (response.status >= 200 && response.status < 300) {
-                    resolve(JSON.parse(data));
+                    resolve(JSON.parse(data)); // data is the response body
                 } else {
                     reject(`HTTP Error: ${response.status}`);
                 }
             });
         } else {
-            reject("Unsupported environment.");
+            // Fallback for completely unsupported environments or if Shadowrocket needs specific implementation
+            console.error("Unsupported environment for network requests. Please check if Shadowrocket uses a different API.");
+            reject("Unsupported environment for network requests.");
         }
     });
 }
