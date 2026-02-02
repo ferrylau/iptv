@@ -183,6 +183,33 @@ async function continuousSign() {
     }
 }
 
+// 领取答题奖励 (使用固定ID)
+async function claimQuizReward() {
+    // 注意: 这里的 missionId, missionInstanceId, examSerialNo 是固定的
+    // 如果答题任务是动态的, 此功能可能会在第二天失效
+    const missionId = "7385";
+    const missionInstanceId = "558400";
+    const examSerialNo = "5000006200094";
+
+    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&missionId=${missionId}&missionInstanceId=${missionInstanceId}&examSerialNo=${examSerialNo}&taskCode=QUIZ1`;
+
+    try {
+        const data = await sendRequest({ url, headers: commonHeaders });
+        console.log('答题奖励响应: ' + JSON.stringify(data));
+        if (data.success && data.data.rewards && data.data.rewards.length > 0) {
+            const reward = data.data.rewards[0];
+            return `✅ 答题奖励领取成功, 获得${reward.amount}g饲料`;
+        } else if (data.msg && (data.msg.includes("已领取") || data.msg.includes("已完成"))) {
+            return `ℹ️ 答题奖励: ${data.msg}`;
+        } else {
+            return `❌ 答题奖励领取失败: ${data.msg || '未知错误'}`;
+        }
+    } catch (error) {
+        console.log(`答题奖励领取异常: ${error}`);
+        return `❌ 答题奖励领取异常: ${error}`;
+    }
+}
+
 // 喂食 (循环多次)
 async function feed() {
     let successCount = 0;
@@ -238,6 +265,10 @@ async function feed() {
     const continuousSignResult = await continuousSign();
     results.push(continuousSignResult);
     console.log(continuousSignResult);
+
+    const quizResult = await claimQuizReward();
+    results.push(quizResult);
+    console.log(quizResult);
 
     const feedResult = await feed();
     results.push(feedResult);
