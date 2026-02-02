@@ -327,12 +327,12 @@ async function feed() {
         console.log("开始执行叮咚农场任务...");
         const results = [];
 
-        results.push(await dailySign());
-        results.push(await continuousSign());
-        results.push(await claimQuizReward());
-        results.push(await claimLotteryReward());
-        results.push(await claimAnyOrderReward());
-        results.push(await feed());
+        results.push(await dailySign()); // 每日签到
+        results.push(await continuousSign()); // 连续签到
+        results.push(await claimQuizReward()); // 问卷
+        results.push(await claimLotteryReward()); // 三餐福袋
+        results.push(await claimAnyOrderReward()); // 任意下单
+        results.push(await feed()); // 喂鱼
 
         const summary = results.filter(res => res).join('\n');
         
