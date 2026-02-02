@@ -183,20 +183,46 @@ async function continuousSign() {
     }
 }
 
-// 喂食
+// 喂食 (循环多次)
 async function feed() {
-    const url = `${apiHost}/api/v2/props/feed?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&propsId=${checkinConfig.propsId}&seedId=${checkinConfig.seedId}&triggerMultiFeed=0`;
+    let successCount = 0;
+    const maxFeeds = 20; // 为防止意外,设置一个最大喂食次数
+    let finalMsg = "未开始喂食或饲料不足"; // 默认消息
 
-    try {
-        const data = await sendRequest({ url, headers: commonHeaders });
-        if (data.success) {
-            return `✅ ${data.data.msg}`;
-        } else {
-            return `❌ 喂食失败: ${data.msg || '未知错误'}`;
+    for (let i = 0; i < maxFeeds; i++) {
+        console.log(`尝试进行第 ${i + 1} 次喂食...`);
+        const url = `${apiHost}/api/v2/props/feed?api_version=9.1.0&app_client_id=1&station_id=${checkinConfig.stationId}&uid=${checkinConfig.uid}&device_id=${checkinConfig.deviceId}&latitude=${checkinConfig.lat}&longitude=${checkinConfig.lng}&device_token=${checkinConfig.deviceToken}&gameId=1&propsId=${checkinConfig.propsId}&seedId=${checkinConfig.seedId}&triggerMultiFeed=0`;
+
+        try {
+            const data = await sendRequest({ url, headers: commonHeaders });
+            console.log(`第 ${i + 1} 次喂食响应: ${JSON.stringify(data)}`);
+
+            if (data.success) {
+                successCount++;
+                finalMsg = data.data.msg; // 保存最后一次成功的消息
+            } else {
+                // 只要服务器返回任何错误, 就停止
+                console.log(`喂食因服务器返回错误而停止: ${data.msg}`);
+                finalMsg = data.msg; // 将错误信息作为最终消息
+                break; // 跳出循环
+            }
+        } catch (error) {
+            console.log(`喂食过程中发生网络或解析异常: ${error}`);
+            finalMsg = `❌ 喂食异常: ${error}`;
+            break; // 发生异常, 跳出循环
         }
-    } catch (error) {
-        console.log(`喂食异常: ${error}`);
-        return `❌ 喂食异常: ${error}`;
+
+        // 喂食成功后, 延迟2秒, 避免请求过于频繁
+        if (i < maxFeeds - 1) { // 最后一次成功后不延迟
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+    }
+
+    if (successCount > 0) {
+        return `✅ 成功喂食 ${successCount} 次。最后提示: ${finalMsg}`;
+    } else {
+        // 如果一次都未成功, 返回导致循环停止或未开始的消息
+        return `ℹ️ 未执行喂食或失败: ${finalMsg}`;
     }
 }
 
