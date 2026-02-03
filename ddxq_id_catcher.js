@@ -19,7 +19,7 @@ const notify = (title, subtitle, body) => {
     console.log(`${finalTitle} ${subtitle} ${body}`);
   }
 };
-
+console.log("zhua propids")
 if ($response && $response.body) {
     if ($response.statusCode !== 200) {
         notify("抓取失败", "❌", `服务器响应码: ${$response.statusCode}`);
