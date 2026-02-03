@@ -201,8 +201,8 @@ async function fetchTaskList(config, headers) {
     return [];
 }
 
-async function claimAnyOrderReward(config, headers) {
-    const taskList = await fetchTaskList(config, headers);
+async function claimAnyOrderReward(config, headers, taskList) {
+    if (!taskList) return `ℹ️ 任意下单任务: 任务列表为空`;
     const anyOrderTask = taskList.find(task => task.taskCode === "ANY_ORDER");
     if (!anyOrderTask || !anyOrderTask.userTaskLogId) return `ℹ️ 任意下单任务: 未在任务列表中找到`;
     
@@ -211,6 +211,64 @@ async function claimAnyOrderReward(config, headers) {
     if (data.success && data.data.rewards && data.data.rewards.length > 0) return `✅ 任意下单奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
     if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) return `ℹ️ 任意下单奖励: ${data.msg || '今日已领取'}`;
     return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
+}
+
+async function doBrowseTask(config, headers, taskCode, taskDisplayName, pageUuid) {
+    // Step 1: Call 'achieve' to complete the task with the full URL.
+    const achieveUrl = `${apiHost}/api/v2/task/achieve?gameId=1&taskCode=${taskCode}&env=PE&native_version=12.16.0&h5_source=&page_type=2&pageUuid=${pageUuid}`;
+    let userTaskLogId;
+
+    try {
+        console.log(`[${config.name}] 正在尝试完成任务: ${taskDisplayName}...`);
+        const achieveData = await sendRequest({ url: achieveUrl, headers });
+        
+        if (achieveData.success && achieveData.data.userTaskLogId) {
+            userTaskLogId = achieveData.data.userTaskLogId;
+            console.log(`[${config.name}] 任务完成成功, 获得logId: ${userTaskLogId}`);
+        } else if (achieveData.code === 2002 || (achieveData.msg && achieveData.msg.includes("已完成"))) {
+            // Task already completed, but we don't have the logId from this call.
+            // We must fetch it from the task list.
+            console.log(`[${config.name}] 任务之前已完成, 正在查找logId...`);
+            const taskList = await fetchTaskList(config, headers);
+            const targetTask = taskList.find(t => t.taskCode === taskCode);
+            if (targetTask && targetTask.userTaskLogId) {
+                if(targetTask.taskStatus === 'REWARDED'){
+                    return `ℹ️ ${taskDisplayName}: 奖励早已领取。`;
+                }
+                userTaskLogId = targetTask.userTaskLogId;
+                console.log(`[${config.name}] 从任务列表找到logId: ${userTaskLogId}`);
+            } else {
+                 return `ℹ️ ${taskDisplayName}: 任务已完成但无法找到logId。`;
+            }
+        } else {
+            // Other errors
+            return `❌ ${taskDisplayName} (步骤1/2)失败: ${achieveData.msg || '未知错误'}`;
+        }
+
+    } catch (e) {
+        return `❌ ${taskDisplayName} (步骤1/2)异常: ${e}`;
+    }
+
+    if (!userTaskLogId) {
+        return `ℹ️ ${taskDisplayName}: 未能获取到logId, 无法领取奖励。`;
+    }
+
+    // Step 2: Claim the reward using the logId.
+    console.log(`[${config.name}] 正在尝试为任务[${taskDisplayName}]领取奖励...`);
+    const rewardUrl = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&userTaskLogId=${userTaskLogId}`;
+    try {
+        const rewardData = await sendRequest({ url: rewardUrl, headers });
+        if (rewardData.success && rewardData.data.rewards && rewardData.data.rewards.length > 0) {
+            return `✅ ${taskDisplayName}领取成功, 获得${rewardData.data.rewards[0].amount}g饲料`;
+        } else if (rewardData.msg && rewardData.msg.includes("已领取")) {
+             return `ℹ️ ${taskDisplayName}: ${rewardData.msg}`;
+        }
+        else {
+            return `❌ ${taskDisplayName} (步骤2/2)领取失败: ${rewardData.msg || '未知错误'}`;
+        }
+    } catch (e) {
+        return `❌ ${taskDisplayName} (步骤2/2)领取奖励异常: ${e}`;
+    }
 }
 
 async function feed(config, headers) {
@@ -265,7 +323,32 @@ async function feed(config, headers) {
         results.push(await executeTask(continuousSign, "连续签到", config, commonHeaders));
         results.push(await executeTask(claimQuizReward, "答题奖励", config, commonHeaders));
         results.push(await executeTask(claimLotteryReward, "三餐福袋", config, commonHeaders));
-        results.push(await executeTask(claimAnyOrderReward, "任意下单奖励", config, commonHeaders));
+        
+        // --- 获取任务列表并处理依赖任务 ---
+        const taskList = await fetchTaskList(config, commonHeaders);
+        if (taskList && taskList.length > 0) {
+            // 处理任意下单奖励
+            const anyOrderTaskFn = (cfg, hdrs) => claimAnyOrderReward(cfg, hdrs, taskList);
+            results.push(await executeTask(anyOrderTaskFn, "任意下单奖励", config, commonHeaders));
+            
+            // 处理自动浏览任务
+            const browseTaskObject = taskList.find(task => task.taskCode === "BROWSE_GOODS3");
+            if (browseTaskObject && browseTaskObject.cmsLink) {
+                const pageUuid = getURLParam(browseTaskObject.cmsLink, 'uuid');
+                if (pageUuid) {
+                    console.log(`[${config.name}] 动态获取到 '浏览品质之爱' 的 pageUuid: ${pageUuid}`);
+                    const browseTaskThunk = (cfg, hdrs) => doBrowseTask(cfg, hdrs, "BROWSE_GOODS3", "浏览品质之爱", pageUuid);
+                    results.push(await executeTask(browseTaskThunk, "浏览品质之爱", config, commonHeaders));
+                } else {
+                    results.push("ℹ️ '浏览品质之爱': 未能在cmsLink中找到pageUuid");
+                }
+            } else {
+                results.push("ℹ️ '浏览品质之爱': 未在任务列表中找到或缺少cmsLink");
+            }
+        } else {
+            console.log(`[${config.name}] 获取任务列表失败, 跳过依赖任务。`);
+        }
+
         results.push(await executeTask(feed, "自动喂食", config, commonHeaders));
 
         const summary = results.filter(res => res).join('\n');
