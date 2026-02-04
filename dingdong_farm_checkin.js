@@ -176,8 +176,26 @@ async function continuousSign(config, headers) {
     return `❌ 连续签到失败: ${data.msg || '未知错误'}`;
 }
 
-async function claimQuizReward(config, headers) {
-    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&missionId=7385&missionInstanceId=558400&examSerialNo=5000006200094&taskCode=QUIZ1`;
+async function claimQuizReward(config, headers, taskList) {
+    if (!taskList) return `ℹ️ 答题奖励: 任务列表为空,跳过`;
+
+    const quizTask = taskList.find(task => task.taskCode === "QUIZ1");
+    if (!quizTask) return `ℹ️ 答题奖励: 未在任务列表中找到`;
+
+    // 如果 buttonStatus 为 TO_ACHIEVE，说明用户还未答题
+    if (quizTask.buttonStatus === 'TO_ACHIEVE') {
+        return `ℹ️ 答题奖励: 请先手动完成答题`;
+    }
+
+    // 检查必要的ID是否存在
+    const { missionId, missionInstanceId, examSerialNo } = quizTask;
+    if (!missionId || !missionInstanceId || !examSerialNo) {
+        return `ℹ️ 答题奖励: 任务缺少必要的ID参数,无法领取`;
+    }
+
+    console.log(`[${config.name}] 动态获取到答题任务ID: missionId=${missionId}, missionInstanceId=${missionInstanceId}, examSerialNo=${examSerialNo}`);
+
+    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&missionId=${missionId}&missionInstanceId=${missionInstanceId}&examSerialNo=${examSerialNo}&taskCode=QUIZ1`;
     const data = await sendRequest({ url, headers });
     if (data.success && data.data.rewards && data.data.rewards.length > 0) return `✅ 答题奖励领取成功, 获得${data.data.rewards[0].amount}g饲料`;
     if (data.msg && (data.msg.includes("已领取") || data.msg.includes("已完成"))) return `ℹ️ 答题奖励: ${data.msg}`;
@@ -348,12 +366,15 @@ async function feed(config, headers) {
         const results = [];
         results.push(await executeTask(dailySign, "每日签到", config, commonHeaders));
         results.push(await executeTask(continuousSign, "连续签到", config, commonHeaders));
-        results.push(await executeTask(claimQuizReward, "答题奖励", config, commonHeaders));
         results.push(await executeTask(claimLotteryReward, "三餐福袋", config, commonHeaders));
         
         // --- 获取任务列表并处理依赖任务 ---
         const taskList = await fetchTaskList(config, commonHeaders);
         if (taskList && taskList.length > 0) {
+            // 处理答题奖励
+            const quizTaskFn = (cfg, hdrs) => claimQuizReward(cfg, hdrs, taskList);
+            results.push(await executeTask(quizTaskFn, "答题奖励", config, commonHeaders));
+
             // 处理任意下单奖励
             const anyOrderTaskFn = (cfg, hdrs) => claimAnyOrderReward(cfg, hdrs, taskList);
             results.push(await executeTask(anyOrderTaskFn, "任意下单奖励", config, commonHeaders));
