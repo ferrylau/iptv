@@ -271,6 +271,33 @@ async function doBrowseTask(config, headers, taskCode, taskDisplayName, pageUuid
     }
 }
 
+async function fetchLatestIds(config, headers) {
+    // Construct the URL using parameters from the config
+    const url = `${apiHost}/api/v2/userguide/detail?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&guideCode=FISHPOND_NEW`;
+    try {
+        const data = await sendRequest({ url, headers });
+        if (data.success && data.data) {
+            const propsId = data.data.feed?.propsId;
+            const seedId = data.data.baseSeed?.seedId;
+
+            if (propsId && seedId) {
+                // Update the config object for the current run
+                config.propsId = propsId.toString();
+                config.seedId = seedId.toString();
+                console.log(`[${config.name}] 成功动态获取ID: propsId=${propsId}, seedId=${seedId}`);
+                return `✅ 动态获取喂食ID成功`;
+            } else {
+                const existingIds = config.propsId && config.seedId;
+                return existingIds ? `ℹ️ 动态获取ID失败, 使用配置中的旧ID` : `❌ 动态获取喂食ID: 响应中未找到ID`;
+            }
+        } else {
+            return `❌ 动态获取喂食ID失败: ${data.msg || '响应格式不正确'}`;
+        }
+    } catch (error) {
+        return `❌ 动态获取喂食ID异常: ${error}`;
+    }
+}
+
 async function feed(config, headers) {
     let successCount = 0;
     const maxFeeds = 20;
@@ -349,6 +376,7 @@ async function feed(config, headers) {
             console.log(`[${config.name}] 获取任务列表失败, 跳过依赖任务。`);
         }
 
+        results.push(await executeTask(fetchLatestIds, "动态获取喂食ID", config, commonHeaders));
         results.push(await executeTask(feed, "自动喂食", config, commonHeaders));
 
         const summary = results.filter(res => res).join('\n');
