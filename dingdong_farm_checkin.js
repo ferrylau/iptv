@@ -231,6 +231,36 @@ async function claimAnyOrderReward(config, headers, taskList) {
     return `ℹ️ 任意下单奖励: ${data.msg || '无法领取'}`;
 }
 
+async function claimHardBoxReward(config, headers, taskList) {
+    if (!taskList) return `ℹ️ 饲料收集器: 任务列表为空`;
+    const hardBoxTask = taskList.find(task => task.taskCode === "HARD_BOX");
+    if (!hardBoxTask) return `ℹ️ 饲料收集器: 未在任务列表中找到`;
+
+    if (!hardBoxTask.userTaskLogId) return `ℹ️ 饲料收集器: 任务没有userTaskLogId`;
+
+    if (hardBoxTask.buttonStatus === 'REWARDED' || hardBoxTask.buttonStatus === 'FINISHED') {
+         return `ℹ️ 饲料收集器: 奖励已领取或任务已结束`;
+    }
+
+    if (hardBoxTask.buttonStatus === 'WAITING_REWARD' && hardBoxTask.hardBoxCanRewardTime) {
+        const now = new Date().getTime();
+        if (now < hardBoxTask.hardBoxCanRewardTime) {
+            return `ℹ️ 饲料收集器: 还未到可领取时间 (北京时间 ${new Date(hardBoxTask.hardBoxCanRewardTime).toLocaleTimeString('zh-CN', { hour12: false })})`;
+        }
+    }
+
+    const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&userTaskLogId=${hardBoxTask.userTaskLogId}`;
+    const data = await sendRequest({ url, headers });
+
+    if (data.success && data.data.rewards && data.data.rewards.length > 0) {
+        return `✅ 饲料收集器领取成功, 获得${data.data.rewards[0].amount}g饲料`;
+    }
+    if ((data.data && data.data.taskStatus === "REWARDED") || (data.msg && data.msg.includes("已领取"))) {
+        return `ℹ️ 饲料收集器: ${data.msg || '今日已领取'}`;
+    }
+    return `❌ 饲料收集器领取失败: ${data.msg || '未知错误'}`;
+}
+
 async function doBrowseTask(config, headers, taskCode, taskDisplayName, pageUuid) {
     // Step 1: Call 'achieve' to complete the task with the full URL.
     const achieveUrl = `${apiHost}/api/v2/task/achieve?gameId=1&taskCode=${taskCode}&env=PE&native_version=12.16.0&h5_source=&page_type=2&pageUuid=${pageUuid}`;
@@ -378,6 +408,10 @@ async function feed(config, headers) {
             // 处理任意下单奖励
             const anyOrderTaskFn = (cfg, hdrs) => claimAnyOrderReward(cfg, hdrs, taskList);
             results.push(await executeTask(anyOrderTaskFn, "任意下单奖励", config, commonHeaders));
+
+            // 处理饲料收集器奖励
+            const hardBoxTaskFn = (cfg, hdrs) => claimHardBoxReward(cfg, hdrs, taskList);
+            results.push(await executeTask(hardBoxTaskFn, "饲料收集器", config, commonHeaders));
             
             // 处理自动浏览任务
             const browseTaskObject = taskList.find(task => task.taskCode === "BROWSE_GOODS3");
