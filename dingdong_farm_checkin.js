@@ -9,6 +9,10 @@
  * 2. 手动配置: 你仍可以在 configs 数组中添加更多手动配置的账号。
  */
 
+const SCRIPT_TIMEOUT = 180; // 全局网络请求超时时间, 单位秒
+const RETRY_COUNT = 3; // 请求失败后的重试次数
+const RETRY_DELAY = 2000; // 每次重试的延迟, 单位毫秒
+
 // --- 多账号配置 ---
 const configs = [
     // ==================================================================
@@ -66,25 +70,46 @@ ${body}
 };
 
 // 统一API的请求函数
-function sendRequest(options) {
-    return new Promise((resolve, reject) => {
-        if (typeof $task !== 'undefined') {
-            $task.fetch(options).then(response => {
-                if (response.statusCode >= 200 && response.statusCode < 300) resolve(JSON.parse(response.body));
-                else reject(`HTTP Error: ${response.statusCode}`);
-            }, reason => reject(`Request Failed: ${reason.error}`));
-        } else if (typeof $httpClient !== 'undefined') {
-            $httpClient.get(options, (error, response, data) => {
-                if (error) reject(`Request Failed: ${error}`);
-                else {
-                    if (response.status >= 200 && response.status < 300) resolve(JSON.parse(data));
-                    else reject(`HTTP Error: ${response.status}`);
+async function sendRequest(originalOptions) {
+    const options = { timeout: SCRIPT_TIMEOUT, ...originalOptions };
+
+    for (let i = 0; i < RETRY_COUNT; i++) {
+        try {
+            const data = await new Promise((resolve, reject) => {
+                if (typeof $task !== 'undefined') {
+                    $task.fetch(options).then(response => {
+                        if (response.statusCode >= 200 && response.statusCode < 300) {
+                            resolve(JSON.parse(response.body));
+                        } else {
+                            reject(`HTTP Error: ${response.statusCode}`);
+                        }
+                    }, reason => reject(`Request Failed: ${reason.error}`));
+                } else if (typeof $httpClient !== 'undefined') {
+                    $httpClient.get(options, (error, response, data) => {
+                        if (error) {
+                            reject(`Request Failed: ${error}`);
+                        } else {
+                            if (response.status >= 200 && response.status < 300) {
+                                resolve(JSON.parse(data));
+                            } else {
+                                reject(`HTTP Error: ${response.status}`);
+                            }
+                        }
+                    });
+                } else {
+                    reject("Unsupported environment for network requests.");
                 }
             });
-        } else {
-            reject("Unsupported environment for network requests.");
+            return data; // 成功, 返回数据并退出循环
+        } catch (error) {
+            console.log(`请求失败, 尝试次数 ${i + 1}/${RETRY_COUNT}. 错误: ${error}`);
+            if (i < RETRY_COUNT - 1) {
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY)); // 等待后重试
+            } else {
+                throw error; // 所有重试失败后, 抛出最后一次的错误
+            }
         }
-    });
+    }
 }
 
 // 从URL中提取参数的辅助函数
