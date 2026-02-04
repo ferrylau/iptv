@@ -389,6 +389,22 @@ async function feed(config, headers) {
     return successCount > 0 ? `✅ 成功喂食 ${successCount} 次。提示: ${finalMsg}` : `ℹ️ 未执行喂食或失败: ${finalMsg}`;
 }
 
+async function checkFishProgress(config, headers) {
+    const url = `${apiHost}/api/v2/userguide/detail?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&guideCode=FISHPOND_NEW`;
+    try {
+        const data = await sendRequest({ url, headers });
+        if (data.success && data.data && data.data.baseSeed) {
+            const progressMsg = data.data.baseSeed.msg;
+            const feedAmount = data.data.feed ? data.data.feed.amount : 'N/A';
+            return `✅ 进度: ${progressMsg} | 剩余饲料: ${feedAmount}g`;
+        } else {
+            return `❌ 查询进度失败: ${data.msg || '响应格式不正确'}`;
+        }
+    } catch (error) {
+        return `❌ 查询进度异常: ${error}`;
+    }
+}
+
 // --- 主执行函数 ---
 (async () => {
     const accountsToRun = processConfigs();
@@ -461,6 +477,7 @@ async function feed(config, headers) {
 
         results.push(await executeTask(fetchLatestIds, "动态获取喂食ID", config, commonHeaders));
         results.push(await executeTask(feed, "自动喂食", config, commonHeaders));
+        results.push(await executeTask(checkFishProgress, "查询最新进度", config, commonHeaders));
 
         const summary = results.filter(res => res).join('\n');
         notify(config.name, '叮咚农场任务报告', '', summary);
