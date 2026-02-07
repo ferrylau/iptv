@@ -212,7 +212,7 @@ async function checkSignInfo(token, cookie, activityId) {
 async function getMemberDetail(token, cookie) {
     console.log("正在获取会员信息 (手机号)...");
     const data = await sendRequest({
-        url: `${API_HOST}/api/intelligence/member/getMemberDetail`,
+        url: `${API_HOST}/api/intelligence/member/getMemberDetail/sign`,
         method: 'GET',
         headers: {
             'user-token': token,
