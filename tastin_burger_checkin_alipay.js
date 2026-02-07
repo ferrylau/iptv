@@ -170,8 +170,33 @@ function processConfigs() {
 
 // --- 业务逻辑函数 ---
 
-async function getActivityId(token, cookie) {
+async function getMemberDetail(token, cookie) {
+    console.log("正在获取会员信息...");
+    const data = await sendRequest({
+        url: `${API_HOST}/api/intelligence/member/getMemberDetail/sign`,
+        method: 'GET',
+        headers: {
+            'user-token': token,
+            'Cookie': cookie
+        },
+    });
+    if (data.code === 200 && data.result) {
+        console.log(`获取会员信息成功: ${data.result.phone}`);
+        return data.result; // 返回完整的用户信息对象
+    }
+    throw new Error(`获取会员信息失败: ${data.msg || '未知错误'}`);
+}
+
+async function getActivityId(token, cookie, memberInfo) {
     console.log("正在获取动态 activityId...");
+    const body = {
+        "shopId": 12810,
+        "birthday": memberInfo.birthday || "1990-01-01",
+        "gender": memberInfo.gender || 0,
+        "nickName": memberInfo.nickName || "tastin-user",
+        "phone": memberInfo.phone
+    };
+
     const data = await sendRequest({
         url: `${API_HOST}/api/minic/shop/intelligence/banner/c/list/sign`,
         method: 'POST',
@@ -179,14 +204,9 @@ async function getActivityId(token, cookie) {
             'user-token': token,
             'Cookie': cookie
         },
-        body: {
-            "shopId": 12810,
-            "birthday": "",
-            "gender": 0,
-            "nickName": "",
-            "phone": ""
-        },
+        body: body,
     });
+
     if (data.code === 200 && data.result) {
         const banner = data.result.find(item => item.bannerName && item.bannerName.includes("积分签到"));
         if (banner && banner.jumpPara) {
@@ -220,22 +240,6 @@ async function checkSignInfo(token, cookie, activityId) {
         return false;
     }
     throw new Error(`检查签到状态失败: ${data.msg || '未知错误'}`);
-}
-
-async function getMemberDetail(token, cookie) {
-    console.log("正在获取会员信息 (手机号)...");
-    const data = await sendRequest({
-        url: `${API_HOST}/api/intelligence/member/getMemberDetail`,
-        method: 'GET',
-        headers: {
-            'user-token': token,
-            'Cookie': cookie
-        },
-    });
-    if (data.code === 200 && data.result?.phone) {
-        return data.result.phone;
-    }
-    throw new Error(`获取手机号失败: ${data.msg || '未知错误'}`);
 }
 
 async function doSign(token, cookie, activityId, phone) {
@@ -286,10 +290,13 @@ async function doSign(token, cookie, activityId, phone) {
         }
 
         try {
-            console.log(`[${name}] 步骤 1/4: 获取活动ID...`);
-            const activityId = await getActivityId(token, cookie);
+            console.log(`[${name}] 步骤 1/4: 获取会员信息...`);
+            const memberInfo = await getMemberDetail(token, cookie);
 
-            console.log(`[${name}] 步骤 2/4: 检查签到状态...`);
+            console.log(`[${name}] 步骤 2/4: 获取活动ID...`);
+            const activityId = await getActivityId(token, cookie, memberInfo);
+
+            console.log(`[${name}] 步骤 3/4: 检查签到状态...`);
             const signStatus = await checkSignInfo(token, cookie, activityId);
 
             if (signStatus) {
@@ -297,12 +304,9 @@ async function doSign(token, cookie, activityId, phone) {
                 summary.push(`[${name}] ${signStatus}`);
                 continue;
             }
-
-            console.log(`[${name}] 步骤 3/4: 获取会员手机号...`);
-            const phone = await getMemberDetail(token, cookie);
             
             console.log(`[${name}] 步骤 4/4: 执行签到...`);
-            const signResult = await doSign(token, cookie, activityId, phone);
+            const signResult = await doSign(token, cookie, activityId, memberInfo.phone);
             
             console.log(`[${name}] ${signResult}`);
             summary.push(`[${name}] ${signResult}`);
