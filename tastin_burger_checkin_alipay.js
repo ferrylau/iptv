@@ -212,7 +212,7 @@ async function checkSignInfo(token, cookie, activityId) {
 async function getMemberDetail(token, cookie) {
     console.log("正在获取会员信息 (手机号)...");
     const data = await sendRequest({
-        url: `${API_HOST}/api/intelligence/member/getMemberDetail/sign`,
+        url: `${API_HOST}/api/intelligence/member/getMemberDetail`,
         method: 'GET',
         headers: {
             'user-token': token,
@@ -273,19 +273,27 @@ async function doSign(token, cookie, activityId, phone) {
         }
 
         try {
+            console.log(`[${name}] 步骤 1/4: 获取活动ID...`);
             const activityId = await getActivityId(token, cookie);
+
+            console.log(`[${name}] 步骤 2/4: 检查签到状态...`);
             const signStatus = await checkSignInfo(token, cookie, activityId);
 
             if (signStatus) {
-                console.log(signStatus);
+                console.log(`[${name}] ${signStatus}`);
                 summary.push(`[${name}] ${signStatus}`);
                 continue;
             }
 
+            console.log(`[${name}] 步骤 3/4: 获取会员手机号...`);
             const phone = await getMemberDetail(token, cookie);
+            
+            console.log(`[${name}] 步骤 4/4: 执行签到...`);
             const signResult = await doSign(token, cookie, activityId, phone);
-            console.log(signResult);
+            
+            console.log(`[${name}] ${signResult}`);
             summary.push(`[${name}] ${signResult}`);
+
         } catch (error) {
             const errorMsg = `❌ 执行失败: ${error.message || error}`;
             console.log(errorMsg);
