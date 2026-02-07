@@ -51,10 +51,10 @@ const COMMON_HEADERS = {
     'version': '3.58.0',
     'channel': '1',
     'Accept': '*/*',
+    'Content-Type': 'application/json',
     'Accept-Charset': 'utf-8',
     'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22G100 ChannelId(17) Ariver/1.1.0 AliApp(AP/10.8.30.6000) Nebula WK RVKType(0) AlipayDefined(nt:WIFI,ws:390|780|3.0,ac:ss) AlipayClient/10.8.30.6000 Language/zh-Hans Region/CN NebulaX/1.0.0 XRiver/10.2.58.1',
-    'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/',
 };
 
 const $ = {
@@ -85,9 +85,9 @@ async function sendRequest(options) {
 
     const isPost = fullOptions.method.toUpperCase() === 'POST';
 
-    // 最终解决方案: 根据抓包, POST请求必须明确指定Content-Type
     if (isPost) {
         fullOptions.headers['Content-Type'] = 'application/json';
+        fullOptions.headers['gray-shop-id'] = '12810';
     }
 
     if (isPost && typeof fullOptions.body !== 'string') {
@@ -178,7 +178,8 @@ async function getMemberDetail(token, cookie) {
         method: 'GET',
         headers: {
             'user-token': token,
-            'Cookie': cookie
+            'Cookie': cookie,
+            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#pages/launch/index'
         },
     });
     if (data.code === 200 && data.result) {
@@ -203,7 +204,8 @@ async function getActivityId(token, cookie, memberInfo) {
         method: 'POST',
         headers: {
             'user-token': token,
-            'Cookie': cookie
+            'Cookie': cookie,
+            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#pages/index/index'
         },
         body: body,
     });
@@ -228,7 +230,8 @@ async function checkSignInfo(token, cookie, activityId) {
         method: 'POST',
         headers: {
             'user-token': token,
-            'Cookie': cookie
+            'Cookie': cookie,
+            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#subpackages/activity/pages/signInActivity/index'
         },
         body: {
             "activityId": activityId
@@ -250,7 +253,8 @@ async function doSign(token, cookie, activityId, phone) {
         method: 'POST',
         headers: {
             'user-token': token,
-            'Cookie': cookie
+            'Cookie': cookie,
+            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#subpackages/activity/pages/signInActivity/index'
         },
         body: {
             "activityId": activityId,
