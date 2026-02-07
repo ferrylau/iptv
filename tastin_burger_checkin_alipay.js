@@ -35,7 +35,7 @@ const configs = [{
     useStore: false,
     account: {
         "token": "sss3369c62c-be8d-469b-a8be-ca8ef43418d9",
-        "cookie": "acw_tc=0a0572b617704704610668530e4bca491f08e13b136922e351523d19ce449d"
+        "cookie": "acw_tc=0a0572b217704725659553905e1e6961b8796c6e8f2e9321d698f66a2ccb18"
     }
     // 若有更多账号, 可复制粘贴此对象, 继续在下方添加
 }, ];
