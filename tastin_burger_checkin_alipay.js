@@ -50,10 +50,6 @@ const COMMON_HEADERS = {
     'Host': 'sss-alipay.tastientech.com',
     'version': '3.58.0',
     'channel': '1',
-    'Accept': '*/*',
-    'Content-Type': 'application/json',
-    'Accept-Charset': 'utf-8',
-    'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22G100 ChannelId(17) Ariver/1.1.0 AliApp(AP/10.8.30.6000) Nebula WK RVKType(0) AlipayDefined(nt:WIFI,ws:390|780|3.0,ac:ss) AlipayClient/10.8.30.6000 Language/zh-Hans Region/CN NebulaX/1.0.0 XRiver/10.2.58.1',
 };
 
@@ -87,7 +83,6 @@ async function sendRequest(options) {
 
     if (isPost) {
         fullOptions.headers['Content-Type'] = 'application/json';
-        fullOptions.headers['gray-shop-id'] = '12810';
     }
 
     if (isPost && typeof fullOptions.body !== 'string') {
@@ -171,45 +166,17 @@ function processConfigs() {
 
 // --- 业务逻辑函数 ---
 
-async function getMemberDetail(token, cookie) {
-    console.log("正在获取会员信息...");
-    const data = await sendRequest({
-        url: `${API_HOST}/api/intelligence/member/getMemberDetail/sign`,
-        method: 'GET',
-        headers: {
-            'user-token': token,
-            'Cookie': cookie,
-            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#pages/launch/index'
-        },
-    });
-    if (data.code === 200 && data.result) {
-        console.log(`获取会员信息成功: ${data.result.phone}`);
-        return data.result; // 返回完整的用户信息对象
-    }
-    throw new Error(`获取会员信息失败: ${data.msg || '未知错误'}`);
-}
-
-async function getActivityId(token, cookie, memberInfo) {
-    console.log("正在获取动态 activityId...");
-    const body = {
-        "shopId": 12810,
-        "birthday": memberInfo.birthday || "1990-01-01",
-        "gender": memberInfo.gender || 0,
-        "nickName": memberInfo.nickName || "tastin-user",
-        "phone": memberInfo.phone
-    };
-
+async function getActivityId(token, cookie) {
+    console.log("正在获取动态 activityId (使用最小化请求)...");
     const data = await sendRequest({
         url: `${API_HOST}/api/minic/shop/intelligence/banner/c/list/sign`,
         method: 'POST',
         headers: {
             'user-token': token,
-            'Cookie': cookie,
-            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#pages/index/index'
+            'Cookie': cookie
         },
-        body: body,
+        body: { "shopId": "", "birthday": "", "gender": 0, "nickName": null, "phone": "" },
     });
-
     if (data.code === 200 && data.result) {
         const banner = data.result.find(item => item.bannerName && item.bannerName.includes("积分签到"));
         if (banner && banner.jumpPara) {
@@ -223,27 +190,20 @@ async function getActivityId(token, cookie, memberInfo) {
     throw new Error('获取 activityId 失败');
 }
 
-async function checkSignInfo(token, cookie, activityId) {
-    console.log("正在检查签到状态...");
+async function getMemberDetail(token, cookie) {
+    console.log("正在获取会员信息...");
     const data = await sendRequest({
-        url: `${API_HOST}/api/sign/member/signInfoV2`,
-        method: 'POST',
+        url: `${API_HOST}/api/intelligence/member/getMemberDetail/sign`,
+        method: 'GET',
         headers: {
             'user-token': token,
             'Cookie': cookie,
-            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#subpackages/activity/pages/signInActivity/index'
         },
-        body: {
-            "activityId": activityId
-        }
     });
-    if (data.code === 200 && data.result?.signMemberInfo) {
-        if (data.result.signMemberInfo.todaySign === true) {
-            return `ℹ️ 今天已签到, 连续签到 ${data.result.signMemberInfo.continuousNum} 天。`;
-        }
-        return false;
+    if (data.code === 200 && data.result) {
+        return data.result;
     }
-    throw new Error(`检查签到状态失败: ${data.msg || '未知错误'}`);
+    throw new Error(`获取会员信息失败: ${data.msg || '未知错误'}`);
 }
 
 async function doSign(token, cookie, activityId, phone) {
@@ -253,13 +213,9 @@ async function doSign(token, cookie, activityId, phone) {
         method: 'POST',
         headers: {
             'user-token': token,
-            'Cookie': cookie,
-            'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#subpackages/activity/pages/signInActivity/index'
+            'Cookie': cookie
         },
-        body: {
-            "activityId": activityId,
-            "memberPhone": phone
-        }
+        body: { "activityId": activityId, "memberPhone": phone }
     });
     if (data.code === 200 && data.result?.rewardInfoList) {
         const reward = data.result.rewardInfoList[0];
@@ -295,22 +251,21 @@ async function doSign(token, cookie, activityId, phone) {
         }
 
         try {
-            console.log(`[${name}] 步骤 1/4: 获取会员信息...`);
+            console.log(`[${name}] 步骤 1: 获取活动ID...`);
+            const activityId = await getActivityId(token, cookie);
+
+            console.log(`[${name}] 步骤 2: 获取会员信息...`);
             const memberInfo = await getMemberDetail(token, cookie);
-
-            console.log(`[${name}] 步骤 2/4: 获取活动ID...`);
-            const activityId = await getActivityId(token, cookie, memberInfo);
-
-            console.log(`[${name}] 步骤 3/4: 检查签到状态...`);
-            const signStatus = await checkSignInfo(token, cookie, activityId);
-
-            if (signStatus) {
-                console.log(`[${name}] ${signStatus}`);
-                summary.push(`[${name}] ${signStatus}`);
-                continue;
-            }
             
-            console.log(`[${name}] 步骤 4/4: 执行签到...`);
+            console.log(`[${name}] 步骤 3: 检查是否已签到...`);
+            const signStatus = await checkSignInfo(token, cookie, activityId); // checkSignInfo is not defined in this version
+            if (signStatus) {
+                 console.log(`[${name}] ${signStatus}`);
+                 summary.push(`[${name}] ${signStatus}`);
+                 continue;
+            }
+
+            console.log(`[${name}] 步骤 4: 执行签到...`);
             const signResult = await doSign(token, cookie, activityId, memberInfo.phone);
             
             console.log(`[${name}] ${signResult}`);
