@@ -81,9 +81,18 @@ async function sendRequest(options) {
         },
         ...options,
     };
-    if (fullOptions.method.toUpperCase() === 'POST' && typeof fullOptions.body !== 'string') {
+
+    const isPost = fullOptions.method.toUpperCase() === 'POST';
+
+    // 最终解决方案: 根据抓包, POST请求必须明确指定Content-Type
+    if (isPost) {
+        fullOptions.headers['Content-Type'] = 'application/json';
+    }
+
+    if (isPost && typeof fullOptions.body !== 'string') {
         fullOptions.body = JSON.stringify(fullOptions.body || {});
     }
+
     const isSurge = typeof $httpClient !== 'undefined';
     for (let i = 0; i < 3; i++) {
         try {
@@ -96,12 +105,16 @@ async function sendRequest(options) {
                         statusCode: resp.status,
                         body: data
                     });
-                    if (fullOptions.method.toUpperCase() === 'POST') $httpClient.post(fullOptions, callback);
+                    if (isPost) $httpClient.post(fullOptions, callback);
                     else $httpClient.get(fullOptions, callback);
                 });
             } else throw new Error("Unsupported environment");
-            if (response.statusCode >= 200 && response.statusCode < 300) return JSON.parse(response.body);
-            else throw `HTTP Error: ${response.statusCode}`;
+
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+                return JSON.parse(response.body);
+            } else {
+                throw `HTTP Error: ${response.statusCode}, Body: ${response.body}`;
+            }
         } catch (error) {
             console.log(`[sendRequest] failed (attempt ${i + 1}/3): ${error}`);
             if (i < 2) await new Promise(resolve => setTimeout(resolve, 2000));
