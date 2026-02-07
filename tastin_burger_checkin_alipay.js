@@ -166,8 +166,33 @@ function processConfigs() {
 
 // --- 业务逻辑函数 ---
 
-async function getActivityId(token, cookie) {
-    console.log("正在获取动态 activityId (使用最小化请求)...");
+async function getMemberDetail(token, cookie) {
+    console.log("正在获取会员信息...");
+    const data = await sendRequest({
+        url: `${API_HOST}/api/intelligence/member/getMemberDetail/sign`,
+        method: 'GET',
+        headers: {
+            'user-token': token,
+            'Cookie': cookie,
+        },
+    });
+    if (data.code === 200 && data.result) {
+        console.log(`获取会员信息成功: ${data.result.phone}`);
+        return data.result; // 返回完整的用户信息对象
+    }
+    throw new Error(`获取会员信息失败: ${data.msg || '未知错误'}`);
+}
+
+async function getActivityId(token, cookie, memberInfo) {
+    console.log("正在获取动态 activityId (使用完整请求体)...");
+    const body = {
+        "shopId": 12810, // 根据抓包此ID似乎是固定的
+        "birthday": memberInfo.birthday || "1990-01-01",
+        "gender": memberInfo.gender || 0,
+        "nickName": memberInfo.nickName || "tastin-user",
+        "phone": memberInfo.phone
+    };
+
     const data = await sendRequest({
         url: `${API_HOST}/api/minic/shop/intelligence/banner/c/list/sign`,
         method: 'POST',
@@ -175,8 +200,9 @@ async function getActivityId(token, cookie) {
             'user-token': token,
             'Cookie': cookie
         },
-        body: { "shopId": "", "birthday": "", "gender": 0, "nickName": null, "phone": "" },
+        body: body,
     });
+
     if (data.code === 200 && data.result) {
         const banner = data.result.find(item => item.bannerName && item.bannerName.includes("积分签到"));
         if (banner && banner.jumpPara) {
@@ -190,21 +216,26 @@ async function getActivityId(token, cookie) {
     throw new Error('获取 activityId 失败');
 }
 
-async function getMemberDetail(token, cookie) {
-    console.log("正在获取会员信息...");
+async function checkSignInfo(token, cookie, activityId) {
+    console.log("正在检查签到状态...");
     const data = await sendRequest({
-        url: `${API_HOST}/api/intelligence/member/getMemberDetail/sign`,
-        method: 'GET',
+        url: `${API_HOST}/api/sign/member/signInfoV2`,
+        method: 'POST',
         headers: {
             'user-token': token,
             'Cookie': cookie,
         },
+        body: { "activityId": activityId }
     });
-    if (data.code === 200 && data.result) {
-        return data.result;
+    if (data.code === 200 && data.result?.signMemberInfo) {
+        if (data.result.signMemberInfo.todaySign === true) {
+            return `ℹ️ 今天已签到, 连续签到 ${data.result.signMemberInfo.continuousNum} 天。`;
+        }
+        return false; // Not signed in
     }
-    throw new Error(`获取会员信息失败: ${data.msg || '未知错误'}`);
+    throw new Error(`检查签到状态失败: ${data.msg || '未知错误'}`);
 }
+
 
 async function doSign(token, cookie, activityId, phone) {
     console.log("正在执行签到...");
@@ -251,20 +282,21 @@ async function doSign(token, cookie, activityId, phone) {
         }
 
         try {
-            console.log(`[${name}] 步骤 1: 获取活动ID...`);
-            const activityId = await getActivityId(token, cookie);
-
-            console.log(`[${name}] 步骤 2: 获取会员信息...`);
+            console.log(`[${name}] 步骤 1: 获取会员信息...`);
             const memberInfo = await getMemberDetail(token, cookie);
-            
-            console.log(`[${name}] 步骤 3: 检查是否已签到...`);
-            const signStatus = await checkSignInfo(token, cookie, activityId); // checkSignInfo is not defined in this version
-            if (signStatus) {
-                 console.log(`[${name}] ${signStatus}`);
-                 summary.push(`[${name}] ${signStatus}`);
-                 continue;
-            }
 
+            console.log(`[${name}] 步骤 2: 获取活动ID...`);
+            const activityId = await getActivityId(token, cookie, memberInfo);
+
+            console.log(`[${name}] 步骤 3: 检查签到状态...`);
+            const signStatus = await checkSignInfo(token, cookie, activityId);
+
+            if (signStatus) {
+                console.log(`[${name}] ${signStatus}`);
+                summary.push(`[${name}] ${signStatus}`);
+                continue;
+            }
+            
             console.log(`[${name}] 步骤 4: 执行签到...`);
             const signResult = await doSign(token, cookie, activityId, memberInfo.phone);
             
