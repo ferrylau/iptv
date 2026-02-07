@@ -50,7 +50,7 @@ const COMMON_HEADERS = {
     'Host': 'sss-alipay.tastientech.com',
     'version': '3.58.0',
     'channel': '1',
-    'Content-Type': 'application/json',
+    // 'Content-Type': 'application/json', // 由HTTP客户端自动管理, 解决415错误
     'Accept': '*/*',
     'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22G100 ChannelId(17) Ariver/1.1.0 AliApp(AP/10.8.30.6000) Nebula WK RVKType(0) AlipayDefined(nt:WIFI,ws:390|780|3.0,ac:ss) AlipayClient/10.8.30.6000 Language/zh-Hans Region/CN NebulaX/1.0.0 XRiver/10.2.58.1',
