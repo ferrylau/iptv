@@ -22,7 +22,7 @@
 // --- (必须) 用户配置 ---
 
 // ！！！重要！！！请务必修改为一个长且随机的字符串作为你的安全密码。
-const SECRET_TOKEN = "change-me-to-a-secret-password";
+const SECRET_TOKEN = "123456";
 
 // 用于访问管理页面的域名, 请与你的 rewrite 规则保持一致。
 const HOSTNAME = "config.local";
