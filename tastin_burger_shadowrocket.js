@@ -39,13 +39,10 @@ const SCRIPT_NAME = "塔斯汀汉堡签到 (支付宝)";
 const TOKEN_KEY = "tsthb_alipay_token";
 const API_HOST = 'https://sss-alipay.tastientech.com';
 
-// 经过验证的、最精确的请求头
 const COMMON_HEADERS = {
-    'Host': 'sss-alipay.tastientech.com',
     'version': '3.58.0',
     'channel': '1',
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22G100 ChannelId(8) Ariver/1.1.0 AliApp(AP/10.8.30.6000) Nebula WK RVKType(0) AlipayDefined(nt:WIFI,ws:390|844|3.0,ac:ss) AlipayClient/10.8.30.6000 Language/zh-Hans Region/CN NebulaX/1.0.0 XRiver/10.2.58.1',
-    'Referer': 'https://2021003128634226.hybrid.alipay-eco.com/2021003128634226/0.3.2601261021.26/index.html#pages/launch/index',
 };
 
 const $ = {
