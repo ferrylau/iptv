@@ -1,9 +1,8 @@
 #!name=获取塔斯汀Token
-#!author=Gemini
 
 [Script]
 # 当访问获取用户信息的API时, 触发脚本
-Tastin_Token_Catcher = type=http-request,pattern=^https://sss-web\.tastientech\.com/api/intelligence/member/getMemberDetail,script-path=tastin_header_catcher.js
+Tastin_Token_Catcher = type=http-request,pattern=^https://sss-web\.tastientech\.com/api/intelligence/member/getMemberDetail,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/tastin_header_catcher.js
 
 [MITM]
 hostname = %APPEND% , sss-web.tastientech.com
