@@ -146,6 +146,11 @@ else {
       method: 'POST'
     };
     const { data } = await sendRequest(options);
+    
+    // --- Debugging Log ---
+    console.log(`JD UserInfo API Response: ${JSON.stringify(data, null, 2)}`);
+    // --- End Debugging Log ---
+    
     if (data && data.retcode === 0 && data.base) {
       return { nickname: data.base.nickname, isLogin: true };
     }
