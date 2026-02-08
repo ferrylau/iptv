@@ -20,7 +20,7 @@
 // --- 配置区 ---
 // 支持多账号, 在此处手动填写京东Cookie, 每个Cookie占一行。
 const manualCookies = [
-  "pt_key=app_openAAJpiKaAADBovCmy0dERDCeDrJEsGWZ0_114V9CABTBJuFD8Whg-jQ0kQqo74NI47Bb3WLIBnIg; pt_pin=jd_5f54b2f173200;",
+  "pt_pin=jd_5f54b2f173200; pt_key=app_openAAJpiKaAADBovCmy0dERDCeDrJEsGWZ0_114V9CABTBJuFD8Whg-jQ0kQqo74NI47Bb3WLIBnIg;",
   // "pt_pin=xxxx; pt_key=yyyy;",
   // "pt_pin=zzzz; pt_key=wwww;",
 ];
