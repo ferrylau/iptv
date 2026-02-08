@@ -9,4 +9,4 @@ hostname = %APPEND% config.local
 # 脚本规则：当访问 config.local 时，返回通用账号管理器的UI界面。
 # script-path=account_manager.js 表示脚本文件就在模块文件旁边。
 # 你也可以使用绝对路径或URL，例如 script-path=https://your-repo/account_manager.js
-通用账号管理器 = type=http-response, regex=^https?:\/\/config\.local, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/account_manager.js, requires-body=true
+通用账号管理器 = type=http-request, regex=^https?:\/\/config\.local, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/account_manager.js, requires-body=true
