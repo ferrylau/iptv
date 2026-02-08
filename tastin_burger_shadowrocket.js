@@ -19,7 +19,7 @@
 // --- 手动配置区 ---
 // 在这里填入你从【微信小程序】抓取的user-token
 const manual_tokens = [
-    "sssfcd295ed-d69b-44e4-97e0-b71b1dd95707", // 替换成你自己的token
+ // 替换成你自己的token
 ];
 // --- 手动配置区结束 ---
 
