@@ -67,28 +67,51 @@ async function sendRequest(options) {
         requestOptions.headers['Content-Type'] = 'application/json';
     }
 
-    let response = {};
+    const maxRetries = 3;
+    let lastError;
 
-    if (isSurge || isShadowrocket) {
-        response = await new Promise((resolve, reject) => {
-            const method = requestOptions.method?.toUpperCase() === 'POST' ? 'post' : 'get';
-            $httpClient[method](requestOptions, (error, resp, data) => {
-                if (error) return reject(error);
-                resolve({ body: data, status: resp.statusCode, headers: resp.headers });
-            });
-        });
-    } else if (isNode) {
-        const resp = await require('node-fetch')(requestOptions.url, requestOptions);
-        response = { body: await resp.text(), status: resp.status, headers: resp.headers.raw() };
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            let response = {};
+
+            if (isSurge || isShadowrocket) {
+                response = await new Promise((resolve, reject) => {
+                    const method = requestOptions.method?.toUpperCase() === 'POST' ? 'post' : 'get';
+                    $httpClient[method](requestOptions, (error, resp, data) => {
+                        if (error) return reject(new Error(`$httpClient错误: ${error}`));
+                        resolve({ body: data, status: resp.statusCode, headers: resp.headers });
+                    });
+                });
+            } else if (isNode) {
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('请求超时')), 5000) // 5秒超时
+                );
+                const fetchPromise = require('node-fetch')(requestOptions.url, requestOptions);
+                
+                const resp = await Promise.race([fetchPromise, timeoutPromise]);
+                response = { body: await resp.text(), status: resp.status, headers: resp.headers.raw() };
+            } else {
+                throw new Error('Unsupported environment');
+            }
+            
+            // 只要收到服务器响应（无论状态码如何），就认为本次网络请求成功，不再重试
+            try {
+                response.body = JSON.parse(response.body);
+            } catch (e) {
+                // 解析失败则保持原样
+            }
+            return response;
+
+        } catch (error) {
+            lastError = error;
+            myprint(`[sendRequest] 第 ${attempt}/${maxRetries} 次尝试失败: ${error.message}`);
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+            }
+        }
     }
-
-    try {
-        response.body = JSON.parse(response.body);
-    } catch (e) {
-        // 解析失败则保持原样
-    }
-
-    return response;
+    // 如果所有尝试都失败了, 抛出最后一次的错误
+    throw lastError;
 }
 
 // --- 业务逻辑 ---
