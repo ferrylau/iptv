@@ -1,0 +1,12 @@
+#!name=通用账号管理器
+#!desc=一个安全、极简的通用账号管理器。启用后，访问 http://config.local?token=你的密码 来管理所有脚本的账号。
+#!author=Gemini
+
+[MITM]
+hostname = %APPEND% config.local
+
+[Script]
+# 脚本规则：当访问 config.local 时，返回通用账号管理器的UI界面。
+# script-path=account_manager.js 表示脚本文件就在模块文件旁边。
+# 你也可以使用绝对路径或URL，例如 script-path=https://your-repo/account_manager.js
+通用账号管理器 = type=http-response, regex=^https?:\/\/config\.local, script-path=account_manager.js, requires-body=true
