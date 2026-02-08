@@ -1,9 +1,6 @@
 /*
  * Tastin Burger Check-in Script
- * 兼容: Quantumult X, Surge, Shadowrocket, Node.js
- * 
- * 移植自网络上的Python脚本, 感谢原作者。
- * 由Gemini重构为多环境兼容版本。
+ * 兼容: Node.js, Surge, Shadowrocket
  *
  * ========== 配置说明 ==========
  * 1. 【微信】抓包 sss-web.tastientech.com 获取请求头中的 user-token。
@@ -12,13 +9,10 @@
  *    - 方法一 (推荐, 适合所有环境):
  *      直接修改下面 `manual_tokens` 数组, 填入你的token。
  *
- *    - 方法二 (Quantumult X):
- *      在QX的 `[task_local]` 下配置好任务后, 到 `构造请求` 中添加一个key为 `tsthb_wechat_token` 的持久化值。
+ *    - 方法二 (Surge / Shadowrocket):
+ *      在App的持久化存储(persistent store)中，添加一个key为 `tsthb_wechat_token` 的键值对，值为你的token。
  *
- *    - 方法三 (Surge / Shadowrocket):
- *      在 `[Script]` 段落中, 使用 `script-update-interval=-1` 来避免脚本被意外更新。
- *
- *    - 方法四 (Node.js):
+ *    - 方法三 (Node.js):
  *      在脚本同目录下创建一个名为 `tsthb_token.txt` 的文件, 每行放一个token。
  */
 
@@ -26,47 +20,31 @@
 // 在这里填入你从【微信小程序】抓取的user-token
 const manual_tokens = [
     "sssfcd295ed-d69b-44e4-97e0-b71b1dd95707", // 替换成你自己的token
-    // "如果你有更多账号，可以加在这里",
 ];
 // --- 手动配置区结束 ---
 
 
 // --- 兼容层与环境变量 ---
 const isNode = typeof process !== 'undefined' && process.versions != null && process.versions.node != null;
-const isQuantumultX = typeof $task !== 'undefined';
 const isSurge = typeof $httpClient !== 'undefined';
 const isShadowrocket = isSurge; // Shadowrocket 兼容 Surge 的 $httpClient
 
 const SCRIPT_NAME = "塔斯汀汉堡签到";
-const TOKEN_KEY = "tsthb_wechat_token"; // 使用新key, 避免和旧的支付宝token混淆
-const NODE_TOKEN_FILE = "tsthb_token.txt";
+const TOKEN_KEY = "tsthb_wechat_token"; // 用于Surge/小火箭的持久化存储key
 const API_HOST = 'https://sss-web.tastientech.com';
 const VERSION = '1.46.8';
 
 const $ = {
     read: (key) => {
-        if (isQuantumultX) return $prefs.valueForKey(key);
         if (isSurge) return $persistentStore.read(key);
-        if (isNode) {
-            try {
-                return require('fs').readFileSync(key, 'utf8');
-            } catch (e) {
-                return null;
-            }
-        }
         return null;
     },
     notify: (title, subtitle = '', body = '') => {
-        if (isQuantumultX) $notify(title, subtitle, body);
         if (isSurge) $notification.post(title, subtitle, body);
-        if (isNode) {
-            // 在Node.js中, 我们也把通知内容加入日志列表
-            const message = `\n---\n${title}\n${subtitle}\n${body}\n---`;
-            console.log(message);
-        }
+        if (isNode) console.log(`\n---\n${title}\n${subtitle}\n${body}\n---`);
     },
     done: (value = {}) => {
-        if (isQuantumultX || isSurge) $done(value);
+        if (isSurge) $done(value);
         if (isNode) process.exit(0);
     }
 };
@@ -84,7 +62,6 @@ async function sendRequest(options) {
         headers: { ...defaultHeaders, ...options.headers },
     };
     
-    // 自动处理 POST 请求的 body 和 Content-Type
     if (requestOptions.method?.toUpperCase() === 'POST' && typeof requestOptions.body === 'object') {
         requestOptions.body = JSON.stringify(requestOptions.body);
         requestOptions.headers['Content-Type'] = 'application/json';
@@ -100,25 +77,21 @@ async function sendRequest(options) {
                 resolve({ body: data, status: resp.statusCode, headers: resp.headers });
             });
         });
-    } else if (isQuantumultX) {
-        const resp = await $task.fetch(requestOptions);
-        response = { body: resp.body, status: resp.statusCode, headers: resp.headers };
     } else if (isNode) {
         const resp = await require('node-fetch')(requestOptions.url, requestOptions);
         response = { body: await resp.text(), status: resp.status, headers: resp.headers.raw() };
     }
 
     try {
-        // 尝试将所有响应体解析为JSON
         response.body = JSON.parse(response.body);
     } catch (e) {
-        // 如果解析失败, 保持其为纯文本
+        // 解析失败则保持原样
     }
 
     return response;
 }
 
-// --- 业务逻辑 (与之前相同, 仅微调) ---
+// --- 业务逻辑 ---
 const all_print_list = [];
 function myprint(message) {
     console.log(message);
@@ -183,11 +156,9 @@ async function runCheckIn(token) {
     
     const lq = signResponse.body;
     if (lq.code === 200) {
-        if (lq.result.rewardInfoList[0].rewardName == null) {
-            myprint(`签到情况：获得 ${lq.result.rewardInfoList[0].point} 积分`);
-        } else {
-            myprint(`签到情况：获得 ${lq.result.rewardInfoList[0].rewardName}`);
-        }
+        const reward = lq.result.rewardInfoList[0];
+        const rewardName = reward.rewardName || `${reward.point} 积分`;
+        myprint(`签到情况：获得 ${rewardName}`);
     } else {
         myprint(`签到情况：${lq.msg}`);
     }
@@ -198,14 +169,11 @@ async function runCheckIn(token) {
     myprint(`============📣 ${SCRIPT_NAME} 📣============`);
     
     let tokens_to_run = [];
-    // 1. 从持久化存储中读取
-    const stored_token = $.read(TOKEN_KEY);
-    if(stored_token) tokens_to_run.push(stored_token);
     
-    // 2. 在Node.js中, 从文件读取
-    if (isNode) {
-        const file_tokens = $.read(NODE_TOKEN_FILE);
-        if (file_tokens) tokens_to_run = tokens_to_run.concat(file_tokens.split('\n'));
+    // 1. 从 Surge/小火箭 的持久化存储中读取
+    if (isSurge) {
+        const stored_token = $.read(TOKEN_KEY);
+        if(stored_token) tokens_to_run.push(stored_token);
     }
 
     // 3. 从手动配置中读取
@@ -232,7 +200,7 @@ async function runCheckIn(token) {
             accountIndex++;
         }
         myprint('\n============📣 执行完毕 📣============');
-        $.notify(SCRIPT_NAME, '执行完毕', all_print_list.join('\n'));
+        if(!isNode) $.notify(SCRIPT_NAME, '执行完毕', all_print_list.join('\n'));
     }
 })().catch((e) => {
     console.error(e);
