@@ -1,7 +1,7 @@
 const scriptName = '叮咚买菜';
 const getCookieRegex = /^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home\?api_version/;
-const dingDongCookieKey = 'dingdongmaicai_checkin_cookie';
-const dingDongBodyKey = 'dingdongmaicai_checkin_body';
+const dingDongCookieKey = 'dingdongmaicai_checkin_cookie_v1';
+const dingDongBodyKey = 'dingdongmaicai_checkin_body_v1';
 const dingDongSyncQinglongKey = 'dingdongmaicai_sync_qinglong';
 const $ = MagicJS(scriptName, "INFO");
 
@@ -36,22 +36,54 @@ function getUserId(cookie) {
   })
 }
 
+function bodyStringToJson(body) {
+    if (typeof body === 'object') return body;
+    if (typeof body !== 'string') return body;
+    let json = {};
+    for (let pair of body.split('&')) {
+        let [key, value] = pair.split('=');
+        if (key) {
+            json[decodeURIComponent(key)] = decodeURIComponent(value || '');
+        }
+    }
+    return json;
+}
+
 function checkIn(cookie, body) {
   return new Promise((resolve, reject) => {
+    const url = 'https://sunquan.api.ddxq.mobi/api/v2/user/signin/';
+    // 复制抓包中的headers
+    const headers = {
+      "Host": "sunquan.api.ddxq.mobi",
+      "ddmc-city-number": body.city_number,
+      "Referer": "https://activity.m.ddxq.mobi/",
+      "Cookie": cookie,
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.68(0x18004433) NetType/WIFI Language/zh_CN miniProgram/wx1e113254eda17715",
+      "ddmc-device-token": body.device_token,
+      "ddmc-os-version": body.os_version,
+      "ddmc-api-version": body.api_version,
+      "Origin": "https://activity.m.ddxq.mobi",
+      "Sec-Fetch-Dest": "empty",
+      "ddmc-build-version": body.native_version,
+      "Sec-Fetch-Site": "same-site",
+      "ddmc-longitude": body.longitude,
+      "ddmc-latitude": body.latitude,
+      "ddmc-app-client-id": body.app_client_id,
+      "Connection": "keep-alive",
+      "Accept-Language": "zh-CN,zh-Hans;q=0.9",
+      "ddmc-channel": body.app_client_name,
+      "ddmc-device-id": body.device_id,
+      "Accept": "*/*",
+      "Content-Type": "application/json;charset=UTF-8",
+      "ddmc-station-id": body.station_id,
+      "ddmc-ip": "",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Sec-Fetch-Mode": "cors"
+    };
+    
     $.http.post({
-      url: 'https://sunquan.api.ddxq.mobi/api/v2/user/signin/',
-      headers: {
-        "Accept": "*/*",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Accept-Language": "zh-cn",
-        "Connection": "keep-alive",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Cookie": cookie,
-        "Host": "sunquan.api.ddxq.mobi",
-        "Origin": "https://activity.m.ddxq.mobi",
-        "Referer": "https://activity.m.ddxq.mobi/",
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/9.15.1 station_id/5500fe01916edfe0738b4e43"
-      },
+      url: url,
+      headers: headers,
       body: body
     }).then(resp => {
       const obj = resp.body;
@@ -67,6 +99,10 @@ function checkIn(cookie, body) {
       } else if (obj.code === 9007) {
         const msg = `签到失败，Cookie已过期`;
         $.logger.warning(`${msg}\n${JSON.stringify(obj)}`);
+        reject(msg);
+      } else {
+        const msg = `签到失败\n${JSON.stringify(obj)}`;
+        $.logger.warning(msg);
         reject(msg);
       }
     }).catch(err => {
@@ -117,7 +153,7 @@ function checkIn(cookie, body) {
         $.logger.info(`开始执行第 ${index + 1} 个Cookies的作业`);
         currentCookie = $.data.read(dingDongCookieKey, "", session);
         currentBody = $.data.read(dingDongBodyKey, "", session);
-        await $.utils.retry(checkIn, 3, 1000)(currentCookie, currentBody).then(msg => {
+        await $.utils.retry(checkIn, 3, 1000)(currentCookie, bodyStringToJson(currentBody)).then(msg => {
           $.notification.post(msg);
         }).catch(err => {
           $.notification.post(err);
