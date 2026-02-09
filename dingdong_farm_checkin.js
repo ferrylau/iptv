@@ -27,19 +27,19 @@ const configs = [
     // 账号二: 手动配置 (示例)
     // 在这里填入你为别人手机抓包获取的所有信息。
     {
-        name: "yl",
+        name: "",
         useStore: false,
-        cookie: 'DDXQSESSID=d16d33v05vh55h563vgvd8dg03ugyygvwhhmk469du71y7e0zwvd4px1jv6ht548',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/12.16.0 station_id/611cd49cb5871d00015f5956 device_id/d53e701967a6e12aeb3905856bbb10913ec2442c relaunchId/B24B9A97-3A4B-4FBD-BA87-18C9F821CCE3',
-        deviceToken: 'BOmAJ4+wMEMav/3XWYarKlECOr25lzhlftlR1DmSyfvkHYzGwrCJ2/LeXwqPwJo1HPKq6BPFEz4Va+KyZr6edCw==',
-        stationId: '611cd49cb5871d00015f5956',
-        uid: '5c70ab5955af540f2c79ab4f',
-        deviceId: 'd53e701967a6e12aeb3905856bbb10913ec2442c',
-        lat: '30.272038',
-        lng: '119.941281',
-        cityNumber: '0901',
-        propsId: '211006153587589079', 
-        seedId: '211006153587660079'   
+        cookie: '',
+        userAgent: '',
+        deviceToken: '',
+        stationId: '',
+        uid: '',
+        deviceId: '',
+        lat: '',
+        lng: '',
+        cityNumber: '',
+        propsId: '', 
+        seedId: ''   
     },
     // ==================================================================
 ];
@@ -263,17 +263,6 @@ async function claimHardBoxReward(config, headers, taskList) {
 
     if (!hardBoxTask.userTaskLogId) return `ℹ️ 饲料收集器: 任务没有userTaskLogId`;
 
-    // if (hardBoxTask.buttonStatus === 'REWARDED' || hardBoxTask.buttonStatus === 'FINISHED') {
-    //      return `ℹ️ 饲料收集器: 奖励已领取或任务已结束`;
-    // }
-
-    // if (hardBoxTask.buttonStatus === 'WAITING_REWARD' && hardBoxTask.hardBoxCanRewardTime) {
-    //     const now = new Date().getTime();
-    //     if (now < hardBoxTask.hardBoxCanRewardTime) {
-    //         return `ℹ️ 饲料收集器: 还未到可领取时间 (北京时间 ${new Date(hardBoxTask.hardBoxCanRewardTime).toLocaleTimeString('zh-CN', { hour12: false })})`;
-    //     }
-    // }
-
     const url = `${apiHost}/api/v2/task/reward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&userTaskLogId=${hardBoxTask.userTaskLogId}`;
     const data = await sendRequest({ url, headers });
 
@@ -290,10 +279,6 @@ async function claimBrowseGoods2Reward(config, headers, taskList) {
     if (!taskList) return `ℹ️ 浏览福利中心: 任务列表为空`;
     const task = taskList.find(t => t.taskCode === "BROWSE_GOODS2");
     if (!task) return `ℹ️ 浏览福利中心: 未在任务列表中找到`;
-
-    // if (task.buttonStatus === 'REWARDED') {
-    //     return `ℹ️ 浏览福利中心: 奖励已领取`;
-    // }
     
     if (!task.userTaskLogId) {
         return `ℹ️ 浏览福利中心: 缺少logId`;
