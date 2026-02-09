@@ -72,6 +72,7 @@ function getUserId(cookie) {
         $.logger.info(`签到Cookie/Body已更新`);
         $.notification.post("叮咚买菜-签到Cookie", "获取成功！", "");
       } else {
+        $.notification.post("签到Cookie无变化，无需更新", "", "");
         $.logger.info("签到Cookie无变化，无需更新");
       }
     }
@@ -88,6 +89,7 @@ function getUserId(cookie) {
           $.logger.info(`农场Headers/URL已更新`);
           $.notification.post("叮咚农场-Headers", "获取成功！", "请在签到脚本中手动填写喂食ID。");
       } else {
+          $.notification.post("农场Headers无变化，无需更新", "", "");
           $.logger.info("农场Headers无变化，无需更新");
       }
     }
