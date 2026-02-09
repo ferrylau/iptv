@@ -130,6 +130,9 @@ function checkIn(cookie, body) {
         $.logger.info(`开始执行第 ${index + 1} 个Cookies的作业`);
         currentCookie = $.data.read(dingDongCookieKey, "", session);
         currentBody = $.data.read(dingDongBodyKey, "", session);
+
+        $.logger.info(`Cookie：${currentCookie}\ncurrentBody：${currentBody}`);
+
         await $.utils.retry(checkIn, 3, 1000)(currentCookie, currentBody).then(msg => {
           $.notification.post(msg);
         }).catch(err => {
