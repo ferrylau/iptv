@@ -41,29 +41,16 @@ function checkIn(cookie, body) {
     $.http.post({
       url: 'https://sunquan.api.ddxq.mobi/api/v2/user/signin/',
       headers: {
-        'Accept': '*/*',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Accept-Language': 'zh-cn',
-        'Connection': 'keep-alive',
-        'ddmc-city-number': '0901',
-        'ddmc-api-version': '9.7.3',        
-        'Sec-Fetch-Dest': 'empty',
-        'ddmc-build-version': '', 
-        'Sec-Fetch-Site': 'same-site',
-        'ddmc-longitude': '119.941419',
-        'ddmc-latitude': '30.272027',
-        'ddmc-app-client-id': '4',
-        'ddmc-channel':'', 
-        'ddmc-device-id': 'osP8I0QoLTGsFfSAbBTLJTVLHV58',        
-        'ddmc-station-id': '611cd49cb5871d00015f5956',
-        'ddmc-ip':'',
-        'Sec-Fetch-Mode': 'cors',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Cookie': cookie,
-        'Host': 'sunquan.api.ddxq.mobi',
-        'Origin': 'https://activity.m.ddxq.mobi',
-        'Referer': 'https://activity.m.ddxq.mobi/',
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.68(0x18004433) NetType/WIFI Language/zh_CN miniProgram/wx1e113254eda17715'
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "zh-cn",
+        "Connection": "keep-alive",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookie,
+        "Host": "sunquan.api.ddxq.mobi",
+        "Origin": "https://activity.m.ddxq.mobi",
+        "Referer": "https://activity.m.ddxq.mobi/",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/9.15.1 station_id/5500fe01916edfe0738b4e43"
       },
       body: body
     }).then(resp => {
@@ -130,9 +117,6 @@ function checkIn(cookie, body) {
         $.logger.info(`开始执行第 ${index + 1} 个Cookies的作业`);
         currentCookie = $.data.read(dingDongCookieKey, "", session);
         currentBody = $.data.read(dingDongBodyKey, "", session);
-
-        $.logger.info(`Cookie：${currentCookie}\ncurrentBody：${currentBody}`);
-
         await $.utils.retry(checkIn, 3, 1000)(currentCookie, currentBody).then(msg => {
           $.notification.post(msg);
         }).catch(err => {
