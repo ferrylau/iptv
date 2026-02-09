@@ -11,4 +11,4 @@ DingDong_Bonus_Catcher = type=http-request, pattern=^https?:\/\/maicai\.api\.ddx
 # DingDong_Bonus_Checkin = type=cron, cronexp="30 9 * * *", script-path=dingdong_checkin_bouns.js, wakeup=1
 
 [MITM]
-hostname = %APPEND% maicai.api.ddxq.mobi, sunquan.api.ddxq.mobi
+hostname = %APPEND%, maicai.api.ddxq.mobi, sunquan.api.ddxq.mobi
