@@ -19,7 +19,6 @@ if ($request && $request.headers && $request.headers['Cookie'] && $request.url) 
     if (!bodyValue) {
         $notification.post("叮咚签到凭证抓取失败❌", "请求URL中未找到所需参数", "请确认触发了正确的接口。");
         $done();
-        return;
     }
 
     // Write the captured data to persistent storage.
