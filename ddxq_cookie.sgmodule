@@ -1,5 +1,8 @@
-#!name=叮咚买菜-通用Cookie
-#!desc=获取叮咚买菜签到、农场等功能的通用Cookie模块。
+#!name=叮咚买菜-获取Cookie(通用)
+#!desc=打开叮咚app->点击我的->鱼塘&积分签到->自动获取cookie
+#!author=ferrylau
+#!system=ios
+
 
 [Script]
 # 叮咚买菜-获取签到Cookie

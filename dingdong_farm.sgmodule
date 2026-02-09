@@ -1,7 +1,8 @@
-#!name=叮咚买菜-农场任务
+#!name=叮咚买菜-自动农场任务
 #!desc=每日自动执行叮咚农场的喂鱼等任务。
 #!author=ferrylau
 #!system=ios
+
 
 [Script]
 叮咚自动签到喂鱼 = type=cron,cronexp="30 7,10,16 * * *",script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/dingdong_farm_checkin.js,timeout=1200

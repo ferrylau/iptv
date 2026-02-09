@@ -1,4 +1,7 @@
-#!name=获取塔斯汀Token
+#!name=塔斯汀-获取token
+#!desc=打开微信小程序->塔斯汀->自动获取token
+#!author=ferrylau
+#!system=ios
 
 [Script]
 # 当访问获取用户信息的API时, 触发脚本
