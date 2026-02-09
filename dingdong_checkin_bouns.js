@@ -1,8 +1,8 @@
 const scriptName = '叮咚买菜';
 const getCookieRegex = /^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home/;
-const dingDongCookieKey = 'dingdongmaicai_checkin_cookie';
-const dingDongBodyKey = 'dingdongmaicai_checkin_body';
-const dingDongHeadersKey = 'dingdongmaicai_checkin_headers'; // 新增一个Key来存储请求头
+const dingDongCookieKey = 'dingdongmaicai_checkin_cookie_v2';
+const dingDongBodyKey = 'dingdongmaicai_checkin_body_v2';
+const dingDongHeadersKey = 'dingdongmaicai_checkin_headers_v2'; // 新增一个Key来存储请求头
 const dingDongSyncQinglongKey = 'dingdongmaicai_sync_qinglong';
 const $ = MagicJS(scriptName, "INFO");
 
