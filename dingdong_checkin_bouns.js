@@ -49,13 +49,6 @@ async function sendRequest(options) {
         headers: { ...defaultHeaders, ...options.headers },
     };
 
-    // For DingDong, the body is form-urlencoded, not JSON
-    if (requestOptions.method?.toUpperCase() === 'POST' && typeof requestOptions.body === 'object') {
-        // This part from tastin script is for JSON, keep it for potential future use but not for current dingdong
-        requestOptions.body = JSON.stringify(requestOptions.body);
-        requestOptions.headers['Content-Type'] = 'application/json';
-    }
-
     const maxRetries = 3;
     let lastError;
 
