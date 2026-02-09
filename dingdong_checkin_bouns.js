@@ -1,4 +1,4 @@
-const scriptName = '叮咚买菜';
+const scriptName = '叮咚买菜积分签到';
 const getCookieRegex = /^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home\?api_version/;
 const dingDongCookieKey = 'dingdongmaicai_checkin_cookie_v1';
 const dingDongBodyKey = 'dingdongmaicai_checkin_body_v1';

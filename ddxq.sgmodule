@@ -1,8 +1,0 @@
-#!name=获取叮咚cookie
-#!author=ferrylau
-
-[Script]
-DD_Farm_Headers = type=http-request,pattern=^https://farm\.api\.ddxq\.mobi/api/v2/userguide/detail, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/ddxq_header_catcher.js
-
-[MITM]
-hostname = %APPEND% , farm.api.ddxq.mobi
