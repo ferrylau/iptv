@@ -1,0 +1,7 @@
+#!name=叮咚买菜-积分签到
+#!desc=每日自动执行叮咚买菜的积分签到任务。
+#!author=ferrylau
+#!system=ios
+
+[Script]
+叮咚自动积分签到 = type=cron,cronexp="0 9 * * *",script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/dingdong_checkin_bouns.js,timeout=30
