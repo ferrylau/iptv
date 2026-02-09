@@ -18,17 +18,16 @@ if ($request && $request.headers && $request.headers['Cookie'] && $request.url) 
 
     if (!bodyValue) {
         $notification.post("叮咚签到凭证抓取失败❌", "请求URL中未找到所需参数", "请确认触发了正确的接口。");
-        $done();
-    }
-
-    // Write the captured data to persistent storage.
-    const cookieSuccess = $persistentStore.write(cookieValue, COOKIE_KEY);
-    const bodySuccess = $persistentStore.write(bodyValue, BODY_KEY);
-
-    if (cookieSuccess && bodySuccess) {
-        $notification.post("叮咚签到凭证抓取成功✅", "Cookie和Body已保存", "请禁用此抓取脚本，避免重复抓取。");
     } else {
-        $notification.post("叮咚签到凭证保存失败❌", "请检查小火箭权限", "无法写入持久化存储。");
+        // Write the captured data to persistent storage.
+        const cookieSuccess = $persistentStore.write(cookieValue, COOKIE_KEY);
+        const bodySuccess = $persistentStore.write(bodyValue, BODY_KEY);
+
+        if (cookieSuccess && bodySuccess) {
+            $notification.post("叮咚签到凭证抓取成功✅", "Cookie和Body已保存", "请禁用此抓取脚本，避免重复抓取。");
+        } else {
+            $notification.post("叮咚签到凭证保存失败❌", "请检查小火箭权限", "无法写入持久化存储。");
+        }
     }
 } else {
     // This message is useful for debugging if the script runs but doesn't find the header.

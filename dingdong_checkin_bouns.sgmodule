@@ -4,7 +4,7 @@
 [Script]
 # 脚本1: 抓取用户凭证 (Cookie & Body)
 # 首次使用时请取消下面这行的注释, 并在App中进入“我的”->"积分"页面, 成功抓取到凭证后, 再次注释掉此行。
-DingDong_Bonus_Catcher = type=http-request, pattern=^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/dingdong_checkin_bouns_header_catcher.js 
+DingDong_Bonus_Catcher = type=http-request, pattern=^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home, script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/dingdong_checkin_bouns_header_catcher.js
 
 # 脚本2: 定时执行签到任务
 # 例如, 设置为每天早上9点30分执行
