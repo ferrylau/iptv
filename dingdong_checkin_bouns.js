@@ -1,20 +1,23 @@
 const scriptName = '叮咚买菜';
-const getCookieRegex = /^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home/;
-const dingDongCookieKey = 'dingdongmaicai_checkin_cookie_v2';
-const dingDongBodyKey = 'dingdongmaicai_checkin_body_v2';
-const dingDongHeadersKey = 'dingdongmaicai_checkin_headers_v2'; // 新增一个Key来存储请求头
+const getCookieRegex = /^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home\?api_version/;
+const dingDongCookieKey = 'dingdongmaicai_checkin_cookie';
+const dingDongBodyKey = 'dingdongmaicai_checkin_body';
 const dingDongSyncQinglongKey = 'dingdongmaicai_sync_qinglong';
 const $ = MagicJS(scriptName, "INFO");
 
 let currentCookie = "";
 let currentBody = "";
-let currentHeaders = {};
 
-function getUserId(cookie, headers) {
+function getUserId(cookie) {
   return new Promise((resolve, reject) => {
     $.http.get({
       url: "https://maicai.api.ddxq.mobi/user/info",
-      headers: { ...headers, "Cookie": cookie }
+      headers: {
+        "Referer": "https://activity.m.ddxq.mobi/",
+        "Host": "maicai.api.ddxq.mobi",
+        "Origin": "https://activity.m.ddxq.mobi",
+        "Cookie": cookie
+      }
     }).then(resp => {
       const obj = resp.body;
       if (obj.code === 0) {
@@ -26,34 +29,43 @@ function getUserId(cookie, headers) {
         reject(msg);
       }
     }).catch(err => {
-      const msg = `获取UserId异常\n${err.message || JSON.stringify(err)}`;
+      const msg = `获取UserId异常\n${err}`;
       $.logger.error(msg);
       reject(msg);
     })
   })
 }
 
-function checkIn(cookie, body, headers) {
+function checkIn(cookie, body) {
   return new Promise((resolve, reject) => {
-    // 合并 ddmc- 请求头和签到请求本身需要的请求头
-    const finalHeaders = {
-      ...headers,
-      "Accept": "*/*",
-      "Accept-Encoding": "gzip, deflate, br",
-      "Accept-Language": "zh-cn",
-      "Connection": "keep-alive",
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Cookie": cookie,
-      "Host": "sunquan.api.ddxq.mobi",
-      "Origin": "https://activity.m.ddxq.mobi",
-      "Referer": "https://activity.m.ddxq.mobi/",
-      "User-Agent": headers['User-Agent'] || headers['user-agent'] || 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/9.15.1 station_id/5500fe01916edfe0738b4e43',
-      "Content-Length": String(body.length)
-    };
-
     $.http.post({
       url: 'https://sunquan.api.ddxq.mobi/api/v2/user/signin/',
-      headers: finalHeaders,
+      headers: {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "zh-cn",
+        "Connection": "keep-alive",
+        "ddmc-city-number": "0901",
+        "ddmc-api-version": "9.7.3",        
+        "Sec-Fetch-Dest": "empty",
+        "ddmc-build-version": "", 
+        "Sec-Fetch-Site": "same-site",
+        "ddmc-longitude": "119.941419",
+        "ddmc-latitude": "30.272027",
+        "ddmc-app-client-id": "4",
+        "ddmc-channel":"", 
+        "ddmc-device-id": "osP8I0QoLTGsFfSAbBTLJTVLHV58",
+        "Accept": "*/*",
+        "ddmc-station-id": "611cd49cb5871d00015f5956",
+        "ddmc-ip":"",
+        "Sec-Fetch-Mode": "cors",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookie,
+        "Host": "sunquan.api.ddxq.mobi",
+        "Origin": "https://activity.m.ddxq.mobi",
+        "Referer": "https://activity.m.ddxq.mobi/",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.68(0x18004433) NetType/WIFI Language/zh_CN miniProgram/wx1e113254eda17715"
+      },
       body: body
     }).then(resp => {
       const obj = resp.body;
@@ -70,13 +82,9 @@ function checkIn(cookie, body, headers) {
         const msg = `签到失败，Cookie已过期`;
         $.logger.warning(`${msg}\n${JSON.stringify(obj)}`);
         reject(msg);
-      } else {
-        const msg = `签到失败，原因: ${obj.msg}`;
-        $.logger.warning(msg);
-        reject(msg);
       }
     }).catch(err => {
-      const msg = `签到出现异常\n${err.message || JSON.stringify(err)}`;
+      const msg = `签到出现异常\n${err}`;
       $.logger.error(msg);
       reject(msg);
     })
@@ -84,88 +92,51 @@ function checkIn(cookie, body, headers) {
 }
 
 ;(async () => {
-  // 抓取模式
   if ($.isRequest && getCookieRegex.test($.request.url)) {
     const cookie = $.request.headers.Cookie;
     const body = $.request.url.split('?')[1];
-    
-    // 抓取所有 ddmc- 开头的请求头
-    const ddmcHeaders = {};
-    for (const key in $.request.headers) {
-      if (key.toLowerCase().startsWith('ddmc-')) {
-        ddmcHeaders[key] = $.request.headers[key];
-      }
-    }
-    // 也把 User-Agent 存下来
-    if($.request.headers['User-Agent']) {
-        ddmcHeaders['User-Agent'] = $.request.headers['User-Agent'];
-    }
-
-    if (!cookie || !body || Object.keys(ddmcHeaders).length === 0) {
-      $.notification.post("❌ 叮咚凭证抓取不完整", "Cookie, Body或ddmc-请求头缺失", "请确认网络环境和模块配置正确。");
-      return $.done();
-    }
-    
-    // 使用 getUserId 获取唯一标识
-    const userId = await $.utils.retry(getUserId, 3, 500)(cookie, ddmcHeaders).catch(err => {
+    // 获取UserId
+    const userId = await $.utils.retry(getUserId, 3, 500)(cookie).catch(err => {
       $.notification.post(err);
       $.done();
     })
-
-    if (!userId) {
-        $.notification.post("❌ 无法获取UserID", "抓取流程终止", "请检查日志。");
-        return $.done();
+    let hisCookie = $.data.read(dingDongCookieKey, "", userId);
+    if (cookie !== hisCookie) {
+      $.data.write(dingDongCookieKey, cookie, userId);
+      $.data.write(dingDongBodyKey, body, userId);
+      $.logger.info(`旧的Cookie：${hisCookie}\n新的Cookie：${cookie}\nCookie不同，写入新的Cookie成功！`);
+      $.notification.post("🎈Cookie写入成功！！");
+    } else {
+      $.logger.info("Cookie没有变化，无需更新");
     }
-
-    // 写入所有凭证
-    $.data.write(dingDongCookieKey, cookie, userId);
-    $.data.write(dingDongBodyKey, body, userId);
-    $.data.write(dingDongHeadersKey, JSON.stringify(ddmcHeaders), userId);
-    $.logger.info(`[${userId}] Cookie, Body, Headers 写入成功！`);
-    $.notification.post("🎈叮咚买菜Cookie写入成功！！", `账号ID: ${userId}`, "可以禁用抓取脚本了。");
-    
-    // 可选的青龙同步
+    // 同步Cookies至青龙面板
     if ($.data.read(dingDongSyncQinglongKey, false) === true) {
+      hisCookie = await $.qinglong.read(dingDongCookieKey, "", userId);
+      if (cookie !== hisCookie) {
         await $.qinglong.write(dingDongCookieKey, cookie, userId);
         await $.qinglong.write(dingDongBodyKey, body, userId);
-        await $.qinglong.write(dingDongHeadersKey, JSON.stringify(ddmcHeaders), userId);
-        $.notification.post("🎈叮咚买菜Cookie同步到青龙面板成功！！");
+        $.logger.info(`旧的Cookie：${hisCookie}\n新的Cookie：${cookie}\nCookie不同，写入新的Cookie成功！`);
+        $.notification.post("🎈Cookie同步到青龙面板成功！！");
+      }
     }
-    return $.done();
-  } 
-  
-  // 执行签到模式
-  else {
+  } else {
     const allSessions = $.data.allSessionNames(dingDongCookieKey);
     if (!allSessions || allSessions.length <= 0) {
       const msg = "没有需要执行的Cookies，请先打开APP获取";
       $.logger.warning(msg);
       $.notification.post(msg);
     } else {
-      $.logger.info(`当前共 ${allSessions.length} 个账号需要执行`);
+      $.logger.info(`当前共 ${allSessions.length} 个Cookies需要执行`);
       for (let [index, session] of allSessions.entries()) {
-        $.logger.info(`开始执行第 ${index + 1} 个账号 [${session}] 的作业`);
+        $.logger.info(`开始执行第 ${index + 1} 个Cookies的作业`);
         currentCookie = $.data.read(dingDongCookieKey, "", session);
         currentBody = $.data.read(dingDongBodyKey, "", session);
-        let headersStr = $.data.read(dingDongHeadersKey, "{}", session);
-        try {
-            currentHeaders = JSON.parse(headersStr);
-        } catch(e) {
-            $.logger.error(`[${session}] 的Headers解析失败，请重新抓取！错误: ${e}`);
-            continue; // 跳过此账号
-        }
-        
-        if (!currentCookie || !currentBody || Object.keys(currentHeaders).length === 0) {
-            $.logger.warning(`[${session}] 的凭证不完整(Cookie/Body/Headers)，跳过执行。`);
-            continue;
-        }
-
-        await $.utils.retry(checkIn, 3, 1000)(currentCookie, currentBody, currentHeaders).then(msg => {
-          $.notification.post(`[${session.substring(0,5)}] ${msg}`);
+        await $.utils.retry(checkIn, 3, 1000)(currentCookie, currentBody).then(msg => {
+          $.notification.post(msg);
         }).catch(err => {
-          $.notification.post(`[${session.substring(0,5)}] ${err}`);
+          $.notification.post(err);
         })
-        $.logger.info(`第 ${index + 1} 个账号 [${session}] 的作业执行完毕`);
+        $.logger.info(`第 ${index + 1} 个Cookies的作业执行完毕`);
       }
     }
   }
