@@ -70,7 +70,7 @@ function checkIn(cookie, body) {
         reject(msg);
       }
     }).catch(err => {
-      const msg = `签到出现异常\n${err}`;
+      const msg = `签到出现异常\n${err.message || JSON.stringify(err)}`;
       $.logger.error(msg);
       reject(msg);
     })
