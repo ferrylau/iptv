@@ -50,7 +50,8 @@ function checkIn(cookie, body) {
         "Host": "sunquan.api.ddxq.mobi",
         "Origin": "https://activity.m.ddxq.mobi",
         "Referer": "https://activity.m.ddxq.mobi/",
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/9.15.1 station_id/5500fe01916edfe0738b4e43"
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 xzone/9.15.1 station_id/5500fe01916edfe0738b4e43",
+        "Content-Length": String(new Blob([body]).size)
       },
       body: body
     }).then(resp => {
