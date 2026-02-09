@@ -1,3 +1,5 @@
+$notification.post("叮咚抓取脚本", "脚本被触发了", "正在检查请求...");
+
 /*
  * DingDong Check-in Bonus - Header Catcher
  *
