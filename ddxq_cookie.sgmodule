@@ -3,10 +3,10 @@
 
 [Script]
 # 叮咚买菜-获取签到Cookie
-DD_Checkin_Cookie = type=http-request,pattern=^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home\?api_version,script-path=ddxq_cookie_catcher.js
+DD_Checkin_Cookie = type=http-request,pattern=^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home\?api_version,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/ddxq_cookie_catcher.js
 
 # 叮咚买菜-获取农场Header
-DD_Farm_Headers = type=http-request,pattern=^https:\/\/farm\.api\.ddxq\.mobi\/api\/v2\/userguide\/detail,script-path=ddxq_cookie_catcher.js
+DD_Farm_Headers = type=http-request,pattern=^https:\/\/farm\.api\.ddxq\.mobi\/api\/v2\/userguide\/detail,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/ddxq_cookie_catcher.js
 
 [MITM]
 hostname = %APPEND%, maicai.api.ddxq.mobi, farm.api.ddxq.mobi
