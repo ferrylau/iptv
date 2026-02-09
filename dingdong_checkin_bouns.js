@@ -1,40 +1,10 @@
-const scriptName = '叮咚买菜积分签到';
-const getCookieRegex = /^https?:\/\/maicai\.api\.ddxq\.mobi\/point\/home\?api_version/;
+const scriptName = '叮咚买菜-积分签到';
 const dingDongCookieKey = 'dingdongmaicai_checkin_cookie_v1';
 const dingDongBodyKey = 'dingdongmaicai_checkin_body_v1';
-const dingDongSyncQinglongKey = 'dingdongmaicai_sync_qinglong';
 const $ = MagicJS(scriptName, "INFO");
 
 let currentCookie = "";
 let currentBody = "";
-
-function getUserId(cookie) {
-  return new Promise((resolve, reject) => {
-    $.http.get({
-      url: "https://maicai.api.ddxq.mobi/user/info",
-      headers: {
-        "Referer": "https://activity.m.ddxq.mobi/",
-        "Host": "maicai.api.ddxq.mobi",
-        "Origin": "https://activity.m.ddxq.mobi",
-        "Cookie": cookie
-      }
-    }).then(resp => {
-      const obj = resp.body;
-      if (obj.code === 0) {
-        $.logger.info(`当前登录用户的UserId:${obj.data.id}`);
-        resolve(obj.data.id);
-      } else {
-        const msg = `获取UserId失败\n${JSON.stringify(resp)}`;
-        $.logger.warning(msg);
-        reject(msg);
-      }
-    }).catch(err => {
-      const msg = `获取UserId异常\n${err}`;
-      $.logger.error(msg);
-      reject(msg);
-    })
-  })
-}
 
 function bodyStringToJson(body) {
     if (typeof body === 'object') return body;
@@ -114,52 +84,23 @@ function checkIn(cookie, body) {
 }
 
 ;(async () => {
-  if ($.isRequest && getCookieRegex.test($.request.url)) {
-    const cookie = $.request.headers.Cookie;
-    const body = $.request.url.split('?')[1];
-    // 获取UserId
-    const userId = await $.utils.retry(getUserId, 3, 500)(cookie).catch(err => {
-      $.notification.post(err);
-      $.done();
-    })
-    let hisCookie = $.data.read(dingDongCookieKey, "", userId);
-    if (cookie !== hisCookie) {
-      $.data.write(dingDongCookieKey, cookie, userId);
-      $.data.write(dingDongBodyKey, body, userId);
-      $.logger.info(`旧的Cookie：${hisCookie}\n新的Cookie：${cookie}\nCookie不同，写入新的Cookie成功！`);
-      $.notification.post("🎈Cookie写入成功！！");
-    } else {
-      $.logger.info("Cookie没有变化，无需更新");
-    }
-    // 同步Cookies至青龙面板
-    if ($.data.read(dingDongSyncQinglongKey, false) === true) {
-      hisCookie = await $.qinglong.read(dingDongCookieKey, "", userId);
-      if (cookie !== hisCookie) {
-        await $.qinglong.write(dingDongCookieKey, cookie, userId);
-        await $.qinglong.write(dingDongBodyKey, body, userId);
-        $.logger.info(`旧的Cookie：${hisCookie}\n新的Cookie：${cookie}\nCookie不同，写入新的Cookie成功！`);
-        $.notification.post("🎈Cookie同步到青龙面板成功！！");
-      }
-    }
+  const allSessions = $.data.allSessionNames(dingDongCookieKey);
+  if (!allSessions || allSessions.length <= 0) {
+    const msg = "没有需要执行签到的Cookies，请先使用[叮咚买菜-通用Cookie]模块获取";
+    $.logger.warning(msg);
+    $.notification.post(msg);
   } else {
-    const allSessions = $.data.allSessionNames(dingDongCookieKey);
-    if (!allSessions || allSessions.length <= 0) {
-      const msg = "没有需要执行的Cookies，请先打开APP获取";
-      $.logger.warning(msg);
-      $.notification.post(msg);
-    } else {
-      $.logger.info(`当前共 ${allSessions.length} 个Cookies需要执行`);
-      for (let [index, session] of allSessions.entries()) {
-        $.logger.info(`开始执行第 ${index + 1} 个Cookies的作业`);
-        currentCookie = $.data.read(dingDongCookieKey, "", session);
-        currentBody = $.data.read(dingDongBodyKey, "", session);
-        await $.utils.retry(checkIn, 3, 1000)(currentCookie, bodyStringToJson(currentBody)).then(msg => {
-          $.notification.post(msg);
-        }).catch(err => {
-          $.notification.post(err);
-        })
-        $.logger.info(`第 ${index + 1} 个Cookies的作业执行完毕`);
-      }
+    $.logger.info(`当前共 ${allSessions.length} 个账号需要执行签到`);
+    for (let [index, session] of allSessions.entries()) {
+      $.logger.info(`开始执行第 ${index + 1} 个账号的签到任务`);
+      currentCookie = $.data.read(dingDongCookieKey, "", session);
+      currentBody = $.data.read(dingDongBodyKey, "", session);
+      await $.utils.retry(checkIn, 3, 1000)(currentCookie, bodyStringToJson(currentBody)).then(msg => {
+        $.notification.post(msg);
+      }).catch(err => {
+        $.notification.post(err);
+      })
+      $.logger.info(`第 ${index + 1} 个账号的签到任务执行完毕`);
     }
   }
   $.done();
