@@ -14,10 +14,10 @@ const checkinBodyKey = 'dingdongmaicai_checkin_body_v1';
 
 // --- 农场相关配置 ---
 const farmUrlRegex = /^https:\/\/farm\.api\.ddxq\.mobi\/api\/v2\/userguide\/detail/;
-const farmHeadersKey = "ddxq_headers"; // 叮咚农场 Headers Key
-const farmUrlKey = "ddxq_url";         // 叮咚农场 URL Key
-const ddxq_props_id_key = "ddxq_props_id";
-const ddxq_seed_id_key = "ddxq_seed_id";
+const farmHeadersKey = "ddxq_headers_v1"; // 叮咚农场 Headers Key
+const farmUrlKey = "ddxq_url_v1";         // 叮咚农场 URL Key
+const ddxq_props_id_key = "ddxq_props_id_v1";
+const ddxq_seed_id_key = "ddxq_seed_id_v1";
 
 // --- 通用工具 ---
 const $ = MagicJS(scriptName, "INFO");

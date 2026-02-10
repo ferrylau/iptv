@@ -44,10 +44,10 @@ const configs = [
 
 const $ = MagicJS("叮咚农场", "INFO");
 
-const ddxq_headers_key = "ddxq_headers";
-const ddxq_url_key = "ddxq_url";
-const ddxq_props_id_key = "ddxq_props_id";
-const ddxq_seed_id_key = "ddxq_seed_id";
+const ddxq_headers_key = "ddxq_headers_v1";
+const ddxq_url_key = "ddxq_url_v1";
+const ddxq_props_id_key = "ddxq_props_id_v1";
+const ddxq_seed_id_key = "ddxq_seed_id_v1";
 const apiHost = 'https://farm.api.ddxq.mobi';
 
 // 统一API的请求函数 (使用MagicJS)
