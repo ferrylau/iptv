@@ -16,6 +16,8 @@ const checkinBodyKey = 'dingdongmaicai_checkin_body_v1';
 const farmUrlRegex = /^https:\/\/farm\.api\.ddxq\.mobi\/api\/v2\/userguide\/detail/;
 const farmHeadersKey = "ddxq_headers"; // 叮咚农场 Headers Key
 const farmUrlKey = "ddxq_url";         // 叮咚农场 URL Key
+const ddxq_props_id_key = "ddxq_props_id";
+const ddxq_seed_id_key = "ddxq_seed_id";
 
 // --- 通用工具 ---
 const $ = MagicJS(scriptName, "INFO");
@@ -50,51 +52,83 @@ function getUserId(cookie) {
 
 // --- Main ---
 ;(async () => {
-  if (!$.isRequest) {
-    return $.done();
-  }
+  // --- 请求处理 ---
+  if ($.isRequest) {
+    const reqUrl = $.request.url;
+    try {
+      // 捕获签到Cookie
+      if (checkinUrlRegex.test(reqUrl)) {
+        $.logger.info('捕获到叮咚买菜签到请求...');
+        const cookie = $.request.headers.Cookie;
+        const body = reqUrl.split('?')[1];
+        
+        const userId = await $.utils.retry(getUserId, 3, 500)(cookie);
 
-  const reqUrl = $.request.url;
-
-  try {
-    // 捕获签到Cookie
-    if (checkinUrlRegex.test(reqUrl)) {
-      $.logger.info('捕获到叮咚买菜签到请求...');
-      const cookie = $.request.headers.Cookie;
-      const body = reqUrl.split('?')[1];
-      
-      const userId = await $.utils.retry(getUserId, 3, 500)(cookie);
-
-      let hisCookie = $.data.read(checkinCookieKey, "", userId);
-      if (cookie !== hisCookie) {
-        $.data.write(checkinCookieKey, cookie, userId);
-        $.data.write(checkinBodyKey, body, userId);
-        $.logger.info(`签到Cookie/Body已更新`);
-        $.notification.post("叮咚买菜-签到Cookie", "获取成功！", "");
-      } else {
-        $.notification.post("签到Cookie无变化，无需更新", "", "");
-        $.logger.info("签到Cookie无变化，无需更新");
+        let hisCookie = $.data.read(checkinCookieKey, "", userId);
+        if (cookie !== hisCookie) {
+          $.data.write(checkinCookieKey, cookie, userId);
+          $.data.write(checkinBodyKey, body, userId);
+          $.logger.info(`签到Cookie/Body已更新`);
+          $.notification.post("叮咚买菜-签到Cookie", "获取成功！", "");
+        } else {
+          $.notification.post("签到Cookie无变化，无需更新", "", "");
+          $.logger.info("签到Cookie无变化，无需更新");
+        }
       }
-    }
-    // 捕获农场Header
-    else if (farmUrlRegex.test(reqUrl)) {
-      $.logger.info('捕获到叮咚农场请求...');
-      const headers = JSON.stringify($.request.headers);
-      const url = $.request.url;
+      // 捕获农场Header
+      else if (farmUrlRegex.test(reqUrl)) {
+        $.logger.info('捕获到叮咚农场请求头...');
+        const headers = JSON.stringify($.request.headers);
+        const url = $.request.url;
 
-      const oldHeaders = $.data.read(farmHeadersKey);
-      if (headers !== oldHeaders) {
-          $.data.write(headers, farmHeadersKey);
-          $.data.write(url, farmUrlKey);
-          $.logger.info(`农场Headers/URL已更新`);
-          $.notification.post("叮咚农场-Headers", "获取成功！", "请在签到脚本中手动填写喂食ID。");
-      } else {
-          $.notification.post("农场Headers无变化，无需更新", "", "");
-          $.logger.info("农场Headers无变化，无需更新");
+        const oldHeaders = $.data.read(farmHeadersKey);
+        if (headers !== oldHeaders) {
+            $.data.write(headers, farmHeadersKey);
+            $.data.write(url, farmUrlKey);
+            $.logger.info(`农场Headers/URL已更新`);
+            $.notification.post("叮咚农场-Headers", "获取成功！", "请在签到脚本中手动填写喂食ID。");
+        } else {
+            $.logger.info("农场Headers无变化，无需更新");
+        }
       }
+    } catch (e) {
+      $.notification.post(`${scriptName}请求捕获失败`, "脚本运行出现异常", e);
     }
-  } catch (e) {
-    $.notification.post(`${scriptName}捕获失败`, "脚本运行出现异常", e);
+  } 
+  // --- 响应处理 ---
+  else if ($.isResponse) {
+    const reqUrl = $.request.url;
+    try {
+      // 捕获农场ID
+      if (farmUrlRegex.test(reqUrl)) {
+        $.logger.info('捕获到叮咚农场响应体...');
+        const body = $.response.body; // MagicJS 会自动尝试解析JSON
+        
+        if (body && body.code === 0 && body.data) {
+          const propsId = body.data.feed?.propsId;
+          const seedId = body.data.baseSeed?.seedId;
+
+          if (propsId && seedId) {
+            const oldPropsId = $.data.read(ddxq_props_id_key);
+            // 只有在ID发生变化时才写入并通知
+            if (oldPropsId !== propsId.toString()) {
+              $.data.write(propsId.toString(), ddxq_props_id_key);
+              $.data.write(seedId.toString(), ddxq_seed_id_key);
+              $.logger.info(`✅ 成功抓取！\npropsId: ${propsId}\nseedId: ${seedId}`);
+              $.notification.post("叮咚农场-喂食ID", "抓取成功 ✅", `新的喂食ID已保存`);
+            } else {
+              $.logger.info("ℹ️ 农场ID无变化, 无需更新");
+            }
+          } else {
+             $.logger.warning(`⚠️ 响应体正确但未找到 propsId 或 seedId`);
+          }
+        } else {
+          $.logger.warning(`❌ 响应体 code 不为 0 或 data 为空`);
+        }
+      }
+    } catch (e) {
+      $.notification.post(`${scriptName}响应捕获失败`, "脚本运行出现异常", e);
+    }
   }
 
   $.done();
