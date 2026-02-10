@@ -11,7 +11,7 @@ DD_Checkin_Cookie = type=http-request,pattern=^https?:\/\/maicai\.api\.ddxq\.mob
 # 叮咚买菜-获取农场Header
 DD_Farm_Headers = type=http-request,pattern=^https:\/\/farm\.api\.ddxq\.mobi\/api\/v2\/userguide\/detail,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/ddxq_cookie_catcher.js
 
-DD_Farm_IDs = type=http-response,pattern=^https:\/\/farm\.api\.ddxq\.mobi\/api\/v2\/userguide\/detail,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/ddxq_cookie_catcher.js, requires-body=true      
+#DD_Farm_IDs = type=http-response,pattern=^https:\/\/farm\.api\.ddxq\.mobi\/api\/v2\/userguide\/detail,script-path=https://raw.githubusercontent.com/ferrylau/iptv/refs/heads/main/ddxq_cookie_catcher.js, requires-body=true      
 
 [MITM]
 hostname = %APPEND%, maicai.api.ddxq.mobi, farm.api.ddxq.mobi

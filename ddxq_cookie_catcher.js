@@ -96,45 +96,6 @@ function getUserId(cookie) {
       $.notification.post(`${scriptName}请求捕获失败`, "脚本运行出现异常", e);
     }
   } 
-  // --- 响应处理 ---
-  else if ($.isResponse) {
-    const reqUrl = $.request.url;
-    $.notification.post("抓到response1", "", "");
-    try {
-      // 捕获农场ID
-      if (farmUrlRegex.test(reqUrl)) {
-        $.notification.post("抓到response2", "", "");
-        $.logger.info('捕获到叮咚农场响应体...');
-        const body = $.response.body; // MagicJS 会自动尝试解析JSON
-        
-        if (body && body.code === 0 && body.data) {
-          $.notification.post("抓到response3", "", "");
-          const propsId = body.data.feed?.propsId;
-          const seedId = body.data.baseSeed?.seedId;
-
-          if (propsId && seedId) {
-            $.notification.post("抓到response4", "", "");
-            const oldPropsId = $persistentStore.read(ddxq_props_id_key);
-            // 只有在ID发生变化时才写入并通知
-            if (oldPropsId !== propsId.toString()) {
-              $persistentStore.write(propsId.toString(), ddxq_props_id_key);
-              $persistentStore.write(seedId.toString(), ddxq_seed_id_key);
-              $.logger.info(`✅ 成功抓取！\npropsId: ${propsId}\nseedId: ${seedId}`);
-              $.notification.post("叮咚农场-喂食ID", "抓取成功 ✅", `新的喂食ID已保存`);
-            } else {
-              $.logger.info("ℹ️ 农场ID无变化, 无需更新");
-            }
-          } else {
-             $.logger.warning(`⚠️ 响应体正确但未找到 propsId 或 seedId`);
-          }
-        } else {
-          $.logger.warning(`❌ 响应体 code 不为 0 或 data 为空`);
-        }
-      }
-    } catch (e) {
-      $.notification.post(`${scriptName}响应捕获失败`, "脚本运行出现异常", e);
-    }
-  }
 
   $.done();
 })();
