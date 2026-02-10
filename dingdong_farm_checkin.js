@@ -80,16 +80,22 @@ function getURLParam(url, name) {
 // 加载和处理配置
 function processConfigs() {
     const processed = [];
-    // 使用 MagicJS 的 $.data 模块, 它会自动处理不同环境的持久化存储
-    const storedHeadersStr = $.data.read(ddxq_headers_key);
-    const storedUrl = $.data.read(ddxq_url_key);
-    const storedPropsId = $.data.read(ddxq_props_id_key);
-    const storedSeedId = $.data.read(ddxq_seed_id_key);
+    // 检查是否在Surge/Shadowrocket环境中
+    const p_store = typeof $persistentStore !== 'undefined' ? $persistentStore : null;
+    if (!p_store) {
+        $.logger.warning("非Surge/Shadowrocket环境，无法读取农场持久化数据！");
+        // 对于手动配置，即使没有p_store也应该继续处理
+    }
+
+    const storedHeadersStr = p_store ? p_store.read(ddxq_headers_key) : null;
+    const storedUrl = p_store ? p_store.read(ddxq_url_key) : null;
+    const storedPropsId = p_store ? p_store.read(ddxq_props_id_key) : null;
+    const storedSeedId = p_store ? p_store.read(ddxq_seed_id_key) : null;
 
     for (const cfg of configs) {
         if (cfg.useStore) {
             if (storedHeadersStr && storedUrl) {
-                console.log(`[${cfg.name}] 检测到已保存的会话信息, 将进行处理。`);
+                $.logger.info(`[${cfg.name}] 检测到已保存的会话信息, 将进行处理。`);
                 const storedHeaders = JSON.parse(storedHeadersStr);
 
                 const getHeader = (key) => {
@@ -113,7 +119,7 @@ function processConfigs() {
                 };
                 processed.push(newConfig);
             } else {
-                console.log(`[${cfg.name}] 配置为自动抓取, 但未找到已保存的会话信息, 跳过。`);
+                $.logger.warning(`[${cfg.name}] 配置为自动抓取, 但未找到已保存的会话信息, 跳过。`);
             }
         } else {
              if (cfg.cookie && cfg.cookie !== '在此填入抓包获取的Cookie') {

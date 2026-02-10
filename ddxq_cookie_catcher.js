@@ -82,10 +82,10 @@ function getUserId(cookie) {
         const headers = JSON.stringify($.request.headers);
         const url = $.request.url;
 
-        const oldHeaders = $.data.read(farmHeadersKey);
+        const oldHeaders = $persistentStore.read(farmHeadersKey);
         if (headers !== oldHeaders) {
-            $.data.write(headers, farmHeadersKey);
-            $.data.write(url, farmUrlKey);
+            $persistentStore.write(headers, farmHeadersKey);
+            $persistentStore.write(url, farmUrlKey);
             $.logger.info(`农场Headers/URL已更新`);
             $.notification.post("叮咚农场-Headers", "获取成功！", "请在签到脚本中手动填写喂食ID。");
         } else {
@@ -112,11 +112,11 @@ function getUserId(cookie) {
           const seedId = body.data.baseSeed?.seedId;
 
           if (propsId && seedId) {
-            const oldPropsId = $.data.read(ddxq_props_id_key);
+            const oldPropsId = $persistentStore.read(ddxq_props_id_key);
             // 只有在ID发生变化时才写入并通知
             if (oldPropsId !== propsId.toString()) {
-              $.data.write(propsId.toString(), ddxq_props_id_key);
-              $.data.write(seedId.toString(), ddxq_seed_id_key);
+              $persistentStore.write(propsId.toString(), ddxq_props_id_key);
+              $persistentStore.write(seedId.toString(), ddxq_seed_id_key);
               $.logger.info(`✅ 成功抓取！\npropsId: ${propsId}\nseedId: ${seedId}`);
               $.notification.post("叮咚农场-喂食ID", "抓取成功 ✅", `新的喂食ID已保存`);
             } else {
