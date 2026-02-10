@@ -76,8 +76,7 @@ function getUserId(cookie) {
         }
       }
       // 捕获农场Header
-      else if (farmUrlRegex.test(reqUrl)) {
-        $.notification.post("抓到request", "", "");
+      else if (farmUrlRegex.test(reqUrl)) {        
         $.logger.info('捕获到叮咚农场请求头...');
         const headers = JSON.stringify($.request.headers);
         const url = $.request.url;
