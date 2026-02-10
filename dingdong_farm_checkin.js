@@ -145,6 +145,47 @@ async function executeTask(taskFn, taskName, config, headers) {
     }
 }
 
+async function handleMultiOrderTask(config, headers) {
+    // 1. Check the task status first
+    const listUrl = `${apiHost}/api/v2/task/list?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=MULTI_ORDER`;
+    
+    let statusData;
+    try {
+        statusData = await sendRequest({ url: listUrl, headers });
+    } catch (e) {
+        return `❌ N单有礼-查询失败: ${e}`;
+    }
+
+    if (!statusData.success || !statusData.data.userTasks || statusData.data.userTasks.length === 0) {
+        return `ℹ️ N单有礼-未找到任务信息。`;
+    }
+
+    const multiOrderTask = statusData.data.userTasks[0];
+    const buttonStatus = multiOrderTask.buttonStatus;
+
+    // 2. If reward is ready, claim it
+    if (buttonStatus === 'TO_RECEIVE') {
+        $.logger.info(`[${config.name}] N单有礼状态为[待领取]，尝试领取奖励...`);
+        const receiveUrl = `${apiHost}/api/v2/task/receive?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=MULTI_ORDER`;
+        
+        try {
+            const receiveData = await sendRequest({ url: receiveUrl, headers });
+            if (receiveData.success) {
+                // After claiming, the new status is usually TO_ACHIEVE
+                const newStatus = receiveData.data?.buttonStatus || '未知';
+                return `✅ N单有礼-领取成功! 新状态: [${newStatus}]`;
+            } else {
+                return `❌ N单有礼-领取失败: ${receiveData.msg || '未知错误'}`;
+            }
+        } catch (e) {
+            return `❌ N单有礼-领取异常: ${e}`;
+        }
+    } else {
+        // If status is not TO_RECEIVE, just report it
+        return `ℹ️ N单有礼-无需领取: 当前状态为 [${buttonStatus}]`;
+    }
+}
+
 async function dailySign(config, headers) {
     const url = `${apiHost}/api/v2/task/achieve?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=DAILY_SIGN`;
     const data = await sendRequest({ url, headers });
@@ -404,6 +445,7 @@ async function checkFishProgress(config, headers) {
         };
 
         const results = [];
+        results.push(await executeTask(handleMultiOrderTask, "N单有礼", config, commonHeaders));
         results.push(await executeTask(dailySign, "每日签到", config, commonHeaders));
         results.push(await executeTask(continuousSign, "连续签到", config, commonHeaders));
         results.push(await executeTask(claimLotteryReward, "三餐福袋", config, commonHeaders));
