@@ -108,10 +108,12 @@ function getUserId(cookie) {
         const body = $.response.body; // MagicJS 会自动尝试解析JSON
         
         if (body && body.code === 0 && body.data) {
+          $.notification.post("抓到response3", "", "");
           const propsId = body.data.feed?.propsId;
           const seedId = body.data.baseSeed?.seedId;
 
           if (propsId && seedId) {
+            $.notification.post("抓到response4", "", "");
             const oldPropsId = $persistentStore.read(ddxq_props_id_key);
             // 只有在ID发生变化时才写入并通知
             if (oldPropsId !== propsId.toString()) {
