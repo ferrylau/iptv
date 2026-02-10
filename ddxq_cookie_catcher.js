@@ -77,6 +77,7 @@ function getUserId(cookie) {
       }
       // 捕获农场Header
       else if (farmUrlRegex.test(reqUrl)) {
+        $.notification.post("抓到request", "", "");
         $.logger.info('捕获到叮咚农场请求头...');
         const headers = JSON.stringify($.request.headers);
         const url = $.request.url;
@@ -98,9 +99,11 @@ function getUserId(cookie) {
   // --- 响应处理 ---
   else if ($.isResponse) {
     const reqUrl = $.request.url;
+    $.notification.post("抓到response1", "", "");
     try {
       // 捕获农场ID
       if (farmUrlRegex.test(reqUrl)) {
+        $.notification.post("抓到response2", "", "");
         $.logger.info('捕获到叮咚农场响应体...');
         const body = $.response.body; // MagicJS 会自动尝试解析JSON
         
