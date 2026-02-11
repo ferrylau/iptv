@@ -163,26 +163,52 @@ async function handleMultiOrderTask(config, headers) {
     const multiOrderTask = statusData.data.userTasks[0];
     const buttonStatus = multiOrderTask.buttonStatus;
 
-    // 2. If reward is ready, claim it
-    if (buttonStatus === 'TO_RECEIVE') {
-        $.logger.info(`[${config.name}] N单有礼状态为[待领取]，尝试领取奖励...`);
+    // 2. If reward is ready to be claimed (TO_REWARD status)
+    if (buttonStatus === 'TO_REWARD') {
+        $.logger.info(`[${config.name}] N单有礼状态为[待领奖]，开始检查可领奖的任务...`);
+
+        const achievableTasks = multiOrderTask.targetRewardRangesVos.filter(t => t.status === 'ACHIEVED' && t.userTaskLogId);
+
+        if (achievableTasks.length === 0) {
+            return `ℹ️ N单有礼: 状态为[待领奖]但未找到可领取的具体任务。`;
+        }
+
+        const logIds = achievableTasks.map(t => t.userTaskLogId).join(',');
+        $.logger.info(`[${config.name}] 找到可领奖的logIds: ${logIds}`);
+
+        const rewardUrl = `${apiHost}/api/v2/task/batchReward?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=MULTI_ORDER&userTaskLogIds=${logIds}`;
+        
+        try {
+            const rewardData = await sendRequest({ url: rewardUrl, headers });
+            if (rewardData.success && rewardData.data.taskRewardsVos) {
+                const rewardAmount = rewardData.data.taskRewardsVos.reduce((sum, task) => {
+                    return sum + task.rewards.reduce((subSum, reward) => subSum + reward.amount, 0);
+                }, 0);
+                return `✅ N单有礼-领取成功! 共获得 ${rewardAmount}g 饲料。`;
+            } else {
+                return `❌ N单有礼-领取失败: ${rewardData.msg || '未知错误'}`;
+            }
+        } catch (e) {
+            return `❌ N单有礼-领取异常: ${e}`;
+        }
+    } else if (buttonStatus === 'TO_RECEIVE') {
+        // Fallback for the old logic, just in case
+        $.logger.info(`[${config.name}] N单有礼状态为[待领取]，尝试激活任务...`);
         const receiveUrl = `${apiHost}/api/v2/task/receive?api_version=9.1.0&app_client_id=1&station_id=${config.stationId}&uid=${config.uid}&device_id=${config.deviceId}&latitude=${config.lat}&longitude=${config.lng}&device_token=${config.deviceToken}&gameId=1&taskCode=MULTI_ORDER`;
         
         try {
             const receiveData = await sendRequest({ url: receiveUrl, headers });
             if (receiveData.success) {
-                // After claiming, the new status is usually TO_ACHIEVE
-                const newStatus = receiveData.data?.buttonStatus || '未知';
-                return `✅ N单有礼-领取成功! 新状态: [${newStatus}]`;
+                return `✅ N单有礼-激活成功! 新状态: [${receiveData.data?.buttonStatus || '未知'}]`;
             } else {
-                return `❌ N单有礼-领取失败: ${receiveData.msg || '未知错误'}`;
+                return `❌ N单有礼-激活失败: ${receiveData.msg || '未知错误'}`;
             }
         } catch (e) {
-            return `❌ N单有礼-领取异常: ${e}`;
+            return `❌ N单有礼-激活异常: ${e}`;
         }
     } else {
-        // If status is not TO_RECEIVE, just report it
-        return `ℹ️ N单有礼-无需领取: 当前状态为 [${buttonStatus}]`;
+        // If status is not TO_REWARD or TO_RECEIVE, just report it
+        return `ℹ️ N单有礼-无需操作: 当前状态为 [${buttonStatus}]`;
     }
 }
 
