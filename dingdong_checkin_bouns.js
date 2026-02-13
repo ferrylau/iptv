@@ -127,7 +127,7 @@ function getWelfareTasks(cookie, body) {
       const obj = (typeof resp.body === 'string') ? JSON.parse(resp.body) : resp.body;
       if (obj.code === 0 && obj.data && obj.data.pointMissionModule) {
         const missions = obj.data.pointMissionModule;
-        const incompleteTasks = missions.filter(task =>  task.missionType.startsWith('view_'));
+        const incompleteTasks = missions.filter(task => task.status === -1 && task.missionType.startsWith('view_'));
         $.logger.info(`获取到 ${incompleteTasks.length} 个未完成的浏览任务`);
         resolve(incompleteTasks);
       } else {
