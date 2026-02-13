@@ -83,6 +83,153 @@ function checkIn(cookie, body) {
   })
 }
 
+function getWelfareTasks(cookie, body) {
+  return new Promise((resolve, reject) => {
+    const url = 'https://gw.api.ddxq.mobi/promocore-service/client/welfare/center/v1/consult';
+    const headers = {
+      "Host": "gw.api.ddxq.mobi",
+      "ddmc-city-number": body.city_number,
+      "Referer": "https://activity.m.ddxq.mobi/",
+      "Cookie": cookie,
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.68(0x18004433) NetType/WIFI Language/zh_CN miniProgram/wx1e113254eda17715",
+      "ddmc-device-token": body.device_token,
+      "ddmc-os-version": body.os_version,
+      "ddmc-api-version": body.api_version,
+      "Origin": "https://activity.m.ddxq.mobi",
+      "Sec-Fetch-Dest": "empty",
+      "ddmc-build-version": body.native_version,
+      "Sec-Fetch-Site": "same-site",
+      "ddmc-longitude": body.longitude,
+      "ddmc-latitude": body.latitude,
+      "ddmc-app-client-id": body.app_client_id,
+      "Connection": "keep-alive",
+      "Accept-Language": "zh-CN,zh-Hans;q=0.9",
+      "ddmc-channel": body.app_client_name,
+      "ddmc-device-id": body.device_id,
+      "Accept": "*/*",
+      "Content-Type": "application/json;charset=UTF-8",
+      "ddmc-station-id": body.station_id,
+      "ddmc-ip": "",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Sec-Fetch-Mode": "cors"
+    };
+    const requestBody = {
+        "api_version": body.api_version, "app_client_id": body.app_client_id,
+        "app_version": "2.87.0", "app_client_name": body.app_client_name || "activity",
+        "station_id": body.station_id, "native_version": body.native_version,
+        "city_name": body.city_name, "city_number": body.city_number, "uid": body.uid,
+        "latitude": body.latitude, "longitude": body.longitude,
+        "device_token": body.device_token, "device_id": body.device_id,
+        "os_version": body.os_version, "app_platform_id": "4"
+    };
+
+    $.http.post({ url: url, headers: headers, body: requestBody }).then(resp => {
+      const obj = (typeof resp.body === 'string') ? JSON.parse(resp.body) : resp.body;
+      if (obj.code === 0 && obj.data && obj.data.pointMissionModule) {
+        const missions = obj.data.pointMissionModule;
+        const incompleteTasks = missions.filter(task => task.status === -1 && task.missionType.startsWith('view_'));
+        $.logger.info(`获取到 ${incompleteTasks.length} 个未完成的浏览任务`);
+        resolve(incompleteTasks);
+      } else {
+        const msg = `获取任务列表失败: ${obj.msg || '未知错误'}`;
+        $.logger.warning(`${msg}\n${JSON.stringify(obj)}`);
+        reject(msg);
+      }
+    }).catch(err => {
+      const msg = `获取任务列表出现异常\n${err}`;
+      $.logger.error(msg);
+      reject(msg);
+    })
+  })
+}
+
+function completeBrowseTask(task, cookie, body) {
+  return new Promise(async (resolve, reject) => {
+    const url = 'https://gw.api.ddxq.mobi/promomission-service/mission/notice/v1/notice';
+    
+    let headers = {
+      "Host": "gw.api.ddxq.mobi",
+      "ddmc-city-number": body.city_number,
+      "Connection": "keep-alive",
+      "Accept": "application/json, text/plain, */*",
+      "ddmc-station-id": body.station_id,
+      "ddmc-device-id": body.device_id,
+      "Sec-Fetch-Site": "same-site",
+      "Accept-Language": "zh-CN,zh-Hans;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Sec-Fetch-Mode": "cors",
+      "Content-Type": "application/json",
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.68(0x18004433) NetType/WIFI Language/zh_CN miniProgram/wx1e113254eda17715",
+      "ddmc-longitude": body.longitude,
+      "ddmc-latitude": body.latitude,
+      "Sec-Fetch-Dest": "empty",
+      "Cookie": cookie
+    };
+    
+    let requestBody = {
+        "latitude": body.latitude, "longitude": body.longitude, "station_id": body.station_id,
+        "city_number": body.city_number, "api_version": body.api_version,
+        "app_client_id": body.app_client_id, "native_version": body.native_version || "0",
+        "missionId": task.missionId, "cityCode": body.city_number,
+        "serialNo": `${Date.now()}.${Math.floor(Math.random() * 9000) + 1000}`
+    };
+
+    const secondsMatch = task.missionTitle.match(/(\d+)秒/);
+    const seconds = secondsMatch ? parseInt(secondsMatch[1], 10) : 10;
+    requestBody.seconds = seconds;
+    
+    if (task.missionType === 'view_cms_page') {
+        headers['Referer'] = 'https://cms.api.ddxq.mobi/';
+        const uuidMatch = task.link.match(/uuid%3D([^&]+)/);
+        const pageUuid = uuidMatch ? uuidMatch[1] : '';
+        if (!pageUuid) return reject(`无法从任务 [${task.missionTitle}] 的链接中提取 pageUuid`);
+
+        requestBody = {...requestBody,
+            "env": "PE", "h5_source": "", "page_type": "",
+            "pageUuid": pageUuid, "pageId": pageUuid, "missionType": "scan",
+        };
+        headers['ddmc-api-version'] = '11.30.1';
+
+    } else if (task.missionType === 'view_flash_sale') {
+        headers['Referer'] = 'https://wx.m.ddxq.mobi/';
+        requestBody = {...requestBody,
+            "uid": body.uid, 
+            "s_id": cookie.match(/DDXQSESSID=([^;]+)/) ? cookie.match(/DDXQSESSID=([^;]+)/)[1] : '',
+            "time": Math.floor(Date.now()/1000),
+            "pageId": "PAGE_NEW_FlASHSALE_V3", "missionType": "promo_scan",
+            "app_client_name":"wechat"
+        };
+        headers['ddmc-uid'] = body.uid;
+        headers['ddmc-api-version'] = '12.17.0';
+
+    } else {
+        return reject(`未知的浏览任务类型: ${task.missionType}`);
+    }
+    
+    $.logger.info(`开始执行任务: [${task.missionTitle}]，模拟浏览 ${seconds} 秒...`);
+    await $.utils.sleep(seconds * 1000);
+
+    $.http.post({ url: url, headers: headers, body: requestBody })
+      .then(resp => {
+          const obj = (typeof resp.body === 'string') ? JSON.parse(resp.body) : resp.body;
+          if (obj.code === 0) {
+              const msg = `任务 [${task.missionTitle}] 完成成功!`;
+              $.logger.info(msg);
+              resolve(msg);
+          } else {
+              const msg = `任务 [${task.missionTitle}] 完成失败: ${obj.msg || '未知错误'}`;
+              $.logger.warning(`${msg}\n${JSON.stringify(obj)}`);
+              reject(msg);
+          }
+      })
+      .catch(err => {
+          const msg = `任务 [${task.missionTitle}] 执行出现异常\n${err}`;
+          $.logger.error(msg);
+          reject(msg);
+      });
+  });
+}
+
 ;(async () => {
   const allSessions = $.data.allSessionNames(dingDongCookieKey);
   if (!allSessions || allSessions.length <= 0) {
@@ -92,15 +239,45 @@ function checkIn(cookie, body) {
   } else {
     $.logger.info(`当前共 ${allSessions.length} 个账号需要执行签到`);
     for (let [index, session] of allSessions.entries()) {
-      $.logger.info(`开始执行第 ${index + 1} 个账号的签到任务`);
+      const account = index + 1;
+      $.logger.info(`\n===== 开始第 ${account} 个账号的任务 =====`);
       currentCookie = $.data.read(dingDongCookieKey, "", session);
       currentBody = $.data.read(dingDongBodyKey, "", session);
-      await $.utils.retry(checkIn, 3, 1000)(currentCookie, bodyStringToJson(currentBody)).then(msg => {
-        $.notification.post(msg);
+      let bodyJson = bodyStringToJson(currentBody);
+
+      $.logger.info(`[任务 ${account}-1] 执行签到`);
+      await $.utils.retry(checkIn, 3, 1000)(currentCookie, bodyJson).then(msg => {
+        $.notification.post(`账号 ${account}：${msg}`);
       }).catch(err => {
-        $.notification.post(err);
+        $.notification.post(`账号 ${account}：${err}`);
       })
-      $.logger.info(`第 ${index + 1} 个账号的签到任务执行完毕`);
+
+      $.logger.info(`[任务 ${account}-2] 获取浏览任务`);
+      await getWelfareTasks(currentCookie, bodyJson)
+        .then(async (tasks) => {
+          if (tasks.length > 0) {
+            $.logger.info(`发现 ${tasks.length} 个可做的浏览任务，开始执行...`);
+            for (const task of tasks) {
+              await completeBrowseTask(task, currentCookie, bodyJson)
+                .then(msg => { 
+                    // Optional: notify on each task success
+                    // $.notification.post(`账号 ${account}：${msg}`);
+                 })
+                .catch(err => { 
+                    $.notification.post(`账号 ${account}：${err}`);
+                });
+              $.logger.info(`延时2秒...`);
+              await $.utils.sleep(2000); 
+            }
+            const summaryMsg = `账号 ${account}：已完成 ${tasks.length} 个浏览任务。`;
+            $.logger.info(summaryMsg);
+            $.notification.post(summaryMsg);
+          }
+        })
+        .catch(err => {
+          $.logger.warning(`第 ${account} 个账号获取浏览任务失败，跳过...`);
+        });
+        $.logger.info(`===== 第 ${account} 个账号的任务全部执行完毕 =====`);
     }
   }
   $.done();
