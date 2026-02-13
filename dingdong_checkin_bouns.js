@@ -127,7 +127,7 @@ function getWelfareTasks(cookie, body) {
       const obj = (typeof resp.body === 'string') ? JSON.parse(resp.body) : resp.body;
       if (obj.code === 0 && obj.data && obj.data.pointMissionModule) {
         const missions = obj.data.pointMissionModule;
-        const incompleteTasks = missions.filter(task => task.missionType.startsWith('view_'));
+        const incompleteTasks = missions.filter(task =>  task.missionType.startsWith('view_'));
         $.logger.info(`获取到 ${incompleteTasks.length} 个未完成的浏览任务`);
         resolve(incompleteTasks);
       } else {
@@ -180,7 +180,7 @@ function completeBrowseTask(task, cookie, body) {
     
     if (task.missionType === 'view_cms_page') {
         headers['Referer'] = 'https://cms.api.ddxq.mobi/';
-        const uuidMatch = task.link.match(/uuid%3D([^&]+)/);
+        const uuidMatch = task.link.match(/([?&]|%3F|%26)uuid(?:=|%3D)([^&%]+)/);
         const pageUuid = uuidMatch ? uuidMatch[1] : '';
         if (!pageUuid) return reject(`无法从任务 [${task.missionTitle}] 的链接中提取 pageUuid`);
 
