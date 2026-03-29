@@ -30,25 +30,8 @@ function sign() {
     }
 }
 
-function findscroll() {
-    let tempText = textContains("盲盒等级").findOne(FIND_WIDGET_TIMEOUT)
-    if (tempText) {
-        var tempPanel = tempText.parent();
-        if (tempPanel) {
-            var linearPanel = tempPanel.parent();
-            // 应该只有两个
-            if (linearPanel.childCount() == 2) {
-                var scrollview = linearPanel.child(1)
-                if (scrollview) {
-                    return scrollview                    
-                }
-            }
-        }
-    }
-}
-
 function doTask() {
-    for (var i = 0; i < 30; i++) {
+    for (var i = 0; i < 39; i++) {
         let panelNode = idContains("homeSignButton").findOne(FIND_WIDGET_TIMEOUT)
         if (panelNode) {        
             panelNode.click()
