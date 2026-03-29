@@ -7,12 +7,12 @@ const targetTexts = ["至高领", "逛逛爆品", "发现惊喜", "好物清单"
 const finishTag = ["状态：已领取", "状态：已完成"]    
 const receiveTag = ["去领取"]    
 
-function isPartialMatch(text, keywords) {
-    if (!text || !keywords || keywords.length === 0) {
-        return false;
-    }
-    return keywords.some(keyword => text.trim().includes(keyword.trim()));
-}
+// function isPartialMatch(text, keywords) {
+//     if (!text || !keywords || keywords.length === 0) {
+//         return false;
+//     }
+//     return keywords.some(keyword => text.trim().includes(keyword.trim()));
+// }
 
 function enterFarm() {
     var can_join = false;
@@ -29,7 +29,7 @@ function enterFarm() {
         }        
     }    
 
-    sleep(3000)
+    sleep(5000)
     //活动太火爆了， 请稍后再试~
     let huobao = text("活动太火爆了， 请稍后再试~").findOne(FIND_WIDGET_TIMEOUT);
     let tiaoguo = text("跳过").findOne(FIND_WIDGET_TIMEOUT);
@@ -47,19 +47,13 @@ function sign() {
     if (signNode && signNode.clickable()) {
         if (signNode.click()) {
             sleep(3000);
-            let backbtn = id("com.jingdong.app.mall:id/fe").findOne(FIND_WIDGET_TIMEOUT)
-            // 判断是否已经签到
-            let judgeText = text("已签到").findOne(FIND_WIDGET_TIMEOUT)
-            if (!judgeText) {
-                // 点击签到
-                let signBtn = text("点击签到领水滴").findOne(FIND_WIDGET_TIMEOUT);
-                if (signBtn && signBtn.clickable()) {
-                    if (signBtn.click()) {
-                        log("签到领水滴成功")
-                    }
-                }                    
-            }
-            backbtn.click()
+            let signBtn = text("点击签到领水滴").findOne(FIND_WIDGET_TIMEOUT);
+            if (signBtn && signBtn.clickable()) {
+                if (signBtn.click()) {
+                    sleep(2000)
+                    log("签到领水滴成功")
+                }
+            }                                
         }                        
     }            
 }
@@ -75,7 +69,7 @@ function getTaskAward() {
             sleep(1000);
             var child2 = parentPanel.child(z);                                                 
             
-            if (isPartialMatch(child2.text(), receiveTag)) {
+            if (jdUtils.isPartialMatch(child2.text(), receiveTag)) {
                 child2.click();
                 sleep(5000);
             }
@@ -141,13 +135,15 @@ function runFarmTasks() {
                     // log("第" + i + " 个子节点信息 ---");
                     // log("Text: " + child.text());     
 
-                    if (isPartialMatch(child.text(), targetTexts)
-                        && !isPartialMatch(child.text(), finishTag)
-                        && !isPartialMatch(child.text(), receiveTag)) {
+                    if (jdUtils.isPartialMatch(child.text(), targetTexts)
+                        && !jdUtils.isPartialMatch(child.text(), finishTag)
+                        && !jdUtils.isPartialMatch(child.text(), receiveTag)) {
                         child.click();
                         sleep(10000);
                         Back();
+                        sleep(1000)
                         Back();
+                        sleep(1000)
                         Back();
                         sleep(2000);
                         jdUtils.restartJD();
@@ -189,7 +185,12 @@ function runFarmTasks() {
                     getTaskAward() // 再领取一次奖励试试
                     break
                 }             
-                sleep(7000)       
+                else {
+                    sleep(1000)
+                    jdUtils.restartJD()
+                    enterFarm()
+                }
+                sleep(2000)       
             }
             else {
                 break;
@@ -197,6 +198,7 @@ function runFarmTasks() {
         }    
         log("浇水完成......")  
     }
+    jdUtils.restartJD();
 }
 
 module.exports = {

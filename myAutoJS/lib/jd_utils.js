@@ -25,8 +25,16 @@ function restartJD() {
     sleep(2000);
 }
 
+function isPartialMatch(text, keywords) {
+    if (!text || !keywords || keywords.length === 0) {
+        return false;
+    }
+    return keywords.some(keyword => text.trim().includes(keyword.trim()));
+}
+
 module.exports = {
     startJD: startJD,
     exitJD: exitJD,
-    restartJD: restartJD
+    restartJD: restartJD,
+    isPartialMatch: isPartialMatch,
 };

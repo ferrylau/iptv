@@ -12,10 +12,10 @@ echo "--- 开始同步项目 ---"
 adb -s $DEVICE shell mkdir -p $REMOTE_DIR/lib
 
 # 2. 推送 main.js
-adb -s $DEVICE push /home/leon/myAutoJS/main.js $REMOTE_DIR/main.js
+adb -s $DEVICE push /home/leon/iptv/myAutoJS/main.js $REMOTE_DIR/main.js
 
 # 3. 推送 lib 目录下的所有内容 (显式处理 lib 文件夹)
-adb -s $DEVICE push /home/leon/myAutoJS/lib/. $REMOTE_DIR/lib/
+adb -s $DEVICE push /home/leon/iptv/myAutoJS/lib/. $REMOTE_DIR/lib/
 
 echo "--- 触发 OpenAutoJS 运行 ---"
 adb -s $DEVICE shell am start -n $PACKAGE_NAME/$RUN_ACTIVITY -d file://$REMOTE_DIR/main.js

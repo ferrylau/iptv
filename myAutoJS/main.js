@@ -1,5 +1,6 @@
 let jdUtils = require("./lib/jd_utils.js");
 let farm = require("./lib/farm.js");
+let miaosha = require("./lib/miaosha.js");
 
 auto.waitFor();
 console.show();
@@ -15,7 +16,9 @@ if (jdUtils.startJD()) {
     sleep(3000); 
 
     // 开始东东农场任务
-    farm.runFarmTasks();
+    // farm.runFarmTasks();
+    // 秒杀任务
+    // miaosha.runTasks();
     
     // 退出
     jdUtils.exitJD();
