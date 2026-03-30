@@ -20,9 +20,9 @@ function exitJD() {
 
 function restartJD() {
     exitJD();
-    sleep(2000);
+    sleep(3000);
     startJD();
-    sleep(2000);
+    sleep(3000);
 }
 
 function isPartialMatch(text, keywords) {

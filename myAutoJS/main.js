@@ -38,9 +38,9 @@ if (jdUtils.startJD()) {
     // sleep(10000)
 
     // 开始东东农场任务
-    // farm.runFarmTasks();
+    farm.runFarmTasks();
     // 秒杀任务
-    // miaosha.runTasks();
+    miaosha.runTasks();
     // 种豆得豆
     Beans.runTasks();
     // 退出

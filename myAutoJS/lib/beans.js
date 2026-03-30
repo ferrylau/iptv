@@ -32,11 +32,15 @@ function sign() {
 
 function getBeans() {
     while (true) {
-        let node1 = textContains("+").findOne(FIND_WIDGET_TIMEOUT)
+        let node1 = textMatches(/\\+[1-9]\\d*/).findOne(FIND_WIDGET_TIMEOUT);
         if (node1) {                   
             let parentSign = node1.parent()
             if (parentSign && parentSign.clickable()) {                                
-                parentSign.click()            
+                parentSign.click()    
+                sleep(3000)
+                jdUtils.restartJD()
+                enterBeans()    
+                sleep(3000)            
             }
             else {
                 break
@@ -45,23 +49,40 @@ function getBeans() {
         else {
             break
         }
-        // sleep(5000)
-        // let node2 = text("限时7日礼包").findOne(FIND_WIDGET_TIMEOUT)
-        // if (node2) {        
-        //     let parentSign = node2.parent()
-        //     if (parentSign && parentSign.clickable()) {                
-        //         parentSign.click()            
-        //     }            
-        // }    
         sleep(5000)
     }
 }
 
 function openTaskPanel() {
-    let node = text("好友助力").findOne(FIND_WIDGET_TIMEOUT).parent().parent().parent()
-    if (node) {        
-        let node1 = node.child(8)
-        node1.click()
+
+
+    while (true) {
+        var ok = false
+        let node = text("好友助力").findOne(FIND_WIDGET_TIMEOUT)
+        if (node) {        
+            let node1 = node.parent()
+            if (node1) {
+                let node2 = node1.parent()
+                if (node2) {
+                    let node3 = node2.parent()
+                    if (node3) {
+                        let node4 = node3.child(8)
+                        node4.click()
+                        ok = true
+                    }
+                }
+            }            
+        }
+
+        if (ok) {
+            sleep(1000)
+            break
+        }
+        else {
+            jdUtils.restartJD()
+            enterBeans()    
+            sleep(3000)        
+        }
     }
 }
 
@@ -78,7 +99,7 @@ function doTask() {
     enterBeans()
     sleep(3000)
 
-    for (var i = 0; i < 20; i++) {
+    for (var i = 0; i < 1; i++) {
         openTaskPanel()
         sleep(3000)        
 
@@ -105,10 +126,10 @@ function runTasks() {
     }
 
     if (enterBeans()) {
-        log("开始做秒杀任务...")
+        log("开始做种豆得豆任务...")
         doTask()
         sleep(10000)
-        log("秒杀任务完成...")
+        log("种豆得豆任务完成...")
         jdUtils.restartJD();
     }
 

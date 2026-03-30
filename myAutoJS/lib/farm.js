@@ -3,16 +3,9 @@ let jdUtils = require("./jd_utils.js");
 let FIND_WIDGET_TIMEOUT = 6000
 const targetTexts = ["至高领", "逛逛爆品", "发现惊喜", "好物清单", "服饰美妆"
                     ,"逛家电家居","逛新品", "京东直播","健康天天低价","看视频赚现金", 
-                    ,"买手机享国补优惠", "逛母婴","免费领"]
+                    ,"买手机享国补优惠", "逛母婴","免费领","直播","黄金","星推官"]
 const finishTag = ["状态：已领取", "状态：已完成"]    
 const receiveTag = ["去领取"]    
-
-// function isPartialMatch(text, keywords) {
-//     if (!text || !keywords || keywords.length === 0) {
-//         return false;
-//     }
-//     return keywords.some(keyword => text.trim().includes(keyword.trim()));
-// }
 
 function enterFarm() {
     var can_join = false;
@@ -42,8 +35,49 @@ function enterFarm() {
 }
 
 function sign() {
-    let signNode = text("点击前往签到页面").findOne(FIND_WIDGET_TIMEOUT);
+    var signNode
     // 签到
+    for (var i = 0;i<20;i++) {
+        signNode = text("点击前往签到页面").findOne(FIND_WIDGET_TIMEOUT);
+        if (!signNode) {
+            sleep(1000)            
+            jdUtils.restartJD();
+            enterFarm();
+            sleep(2000);            
+        }
+        else {
+            break
+        }
+    }
+
+    var jdbeans = textContains("京豆").findOne(FIND_WIDGET_TIMEOUT);
+    if (jdbeans) {
+        jdbeans.click()
+        sleep(5000)
+
+        var getbeans = textContains("https://img11.360buyimg.com").findOne(FIND_WIDGET_TIMEOUT);
+        if (getbeans) {
+            getbeans.click()
+            sleep(5000)
+        }
+        jdUtils.restartJD();
+        enterFarm();
+        sleep(2000);           
+    }
+
+    for (var i = 0;i<20;i++) {
+        signNode = text("点击前往签到页面").findOne(FIND_WIDGET_TIMEOUT);
+        if (!signNode) {
+            sleep(1000)            
+            jdUtils.restartJD();
+            enterFarm();
+            sleep(2000);            
+        }
+        else {
+            break
+        }
+    }    
+
     if (signNode && signNode.clickable()) {
         if (signNode.click()) {
             sleep(3000);
