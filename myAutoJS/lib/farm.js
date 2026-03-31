@@ -7,20 +7,10 @@ const targetTexts = ["至高领", "逛逛爆品", "发现惊喜", "好物清单"
 const finishTag = ["状态：已领取", "状态：已完成"]    
 const receiveTag = ["去领取"]    
 
+const CURRENT_NAME = "东东农场"
+
 function enterFarm() {
-    var can_join = false;
-    let farmNode = text("东东农场").findOne(FIND_WIDGET_TIMEOUT);
-    // 进入东东农场
-    if (farmNode) {
-        if (farmNode.clickable()){
-            can_join = farmNode.click();
-        } else {
-            let parentNode = farmNode.parent();
-            if (parentNode.clickable()) {
-                can_join = parentNode.click();
-            }
-        }        
-    }    
+    let can_join = jdUtils.enterActivity(CURRENT_NAME);    
 
     sleep(5000)
     //活动太火爆了， 请稍后再试~

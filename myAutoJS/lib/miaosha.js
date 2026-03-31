@@ -1,21 +1,11 @@
 let jdUtils = require("./jd_utils.js");
 
 let FIND_WIDGET_TIMEOUT = 6000
+
+const CURRENT_NAME = "京东秒杀"
+
 function enterMisosha() {
-    var can_join = false;
-    let msNode = text("秒杀").findOne(FIND_WIDGET_TIMEOUT);
-    // 进入秒杀
-    if (msNode) {
-        if (msNode.clickable()){
-            can_join = msNode.click();
-        } else {
-            let parentNode = msNode.parent();
-            if (parentNode.clickable()) {
-                can_join = parentNode.click();
-            }
-        }        
-    }    
-    sleep(5000)
+    let can_join = jdUtils.enterActivity(CURRENT_NAME);        
     return can_join
 }
 

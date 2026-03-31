@@ -11,10 +11,12 @@ jdUtils.exitJD();
 
 log("启动京东...");
 
+
+
 if (jdUtils.startJD()) {
     log("京东已在前台，等待界面渲染...!");
     // 给 3 秒让首页渲染完全
-    sleep(3000); 
+    sleep(3000);     
 
     // let farmNode = text("秒杀").findOne();
     // if (farmNode) {
@@ -38,11 +40,11 @@ if (jdUtils.startJD()) {
     // sleep(10000)
 
     // 开始东东农场任务
-    // farm.runFarmTasks();
+    farm.runFarmTasks();
     // 秒杀任务
     // miaosha.runTasks();
     // 种豆得豆
-    Beans.runTasks();
+    // Beans.runTasks();
     // 退出
     jdUtils.exitJD();
   

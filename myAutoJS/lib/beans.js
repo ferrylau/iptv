@@ -1,21 +1,10 @@
 let jdUtils = require("./jd_utils.js");
 
 let FIND_WIDGET_TIMEOUT = 6000
+const CURRENT_NAME = "种豆得豆"
+
 function enterBeans() {
-    var can_join = false;
-    let beansNode = text("种豆得豆").findOne(FIND_WIDGET_TIMEOUT);
-    // 进入
-    if (beansNode) {
-        if (beansNode.clickable()){
-            can_join = beansNode.click();
-        } else {
-            let parentNode = beansNode.parent();
-            if (parentNode.clickable()) {
-                can_join = parentNode.click();
-            }
-        }        
-    }    
-    sleep(5000)
+    let can_join = jdUtils.enterActivity(CURRENT_NAME);    
     return can_join
 }
 
