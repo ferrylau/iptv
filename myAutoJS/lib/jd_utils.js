@@ -22,7 +22,8 @@ function findtextAndClick(tx, sleeptime) {
             return false
         }
         let flag = click(xp, yp)
-        sleep(sleeptime)        
+        sleep(sleeptime)    
+        toastLog("click=" + tx + " flag=" + flag)    
         return flag
     }
     return false
@@ -40,6 +41,7 @@ function startJD() {
             findtextAndClick("浏览记录", 3000)
             text("频道").waitFor();
             findtextAndClick("频道", 3000)
+            text("我看过的频道").waitFor();            
             loaded = true;
             break;
         }
