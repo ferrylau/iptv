@@ -32,8 +32,11 @@ function sign() {
 
 function getBeans() {
     while (true) {
-        let node1 = textMatches(/\\+[1-9]\\d*/).findOne(FIND_WIDGET_TIMEOUT);
-        if (node1) {                   
+        let node1 = textContains("+").findOne(FIND_WIDGET_TIMEOUT);
+        if (node1) {     
+            if (node1.text() == "+0") {
+                break
+            }              
             let parentSign = node1.parent()
             if (parentSign && parentSign.clickable()) {                                
                 parentSign.click()    
@@ -99,7 +102,7 @@ function doTask() {
     enterBeans()
     sleep(3000)
 
-    for (var i = 0; i < 1; i++) {
+    for (var i = 0; i < 20; i++) {
         openTaskPanel()
         sleep(3000)        
 
