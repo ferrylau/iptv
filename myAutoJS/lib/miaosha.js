@@ -43,16 +43,16 @@ function doTask() {
 
 function runTasks() {
     if(enterMisosha()) {
-        log("开始签到秒杀...")        
+        toastLog("开始签到秒杀...")        
         sign()
-        log("签到完成，准备重启......")   
+        toastLog("签到完成，准备重启......")   
         jdUtils.restartJD()      
     }
 
     if (enterMisosha()) {
-        log("开始做秒杀任务...")
+        toastLog("开始做秒杀任务...")
         doTask()
-        log("秒杀任务完成...")
+        toastLog("秒杀任务完成...")
         jdUtils.restartJD();
     }
 }

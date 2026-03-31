@@ -75,7 +75,7 @@ function sign() {
             if (signBtn && signBtn.clickable()) {
                 if (signBtn.click()) {
                     sleep(2000)
-                    log("签到领水滴成功")
+                    toastLog("签到领水滴成功")
                 }
             }                                
         }                        
@@ -112,15 +112,15 @@ function getTaskAward() {
 function runFarmTasks() {
     // 水滴签到
     if (enterFarm()) {
-        log("开始签到......")   
+        toastLog("开始签到......")   
         sign() // 签到
-        log("签到完成，准备重启......")   
+        toastLog("签到完成，准备重启......")   
         jdUtils.restartJD()                            
     }
 
     // 做领水滴任务        
     if (enterFarm()) {         
-        log("开始做任务......")   
+        toastLog("开始做任务......")   
         var state = "打开水滴任务";
 
         var i = -1
@@ -156,8 +156,8 @@ function runFarmTasks() {
                     }                            
 
                     var child = parentPanel.child(i);
-                    // log("第" + i + " 个子节点信息 ---");
-                    // log("Text: " + child.text());     
+                    // toastLog("第" + i + " 个子节点信息 ---");
+                    // toastLog("Text: " + child.text());     
 
                     if (jdUtils.isPartialMatch(child.text(), targetTexts)
                         && !jdUtils.isPartialMatch(child.text(), finishTag)
@@ -188,7 +188,7 @@ function runFarmTasks() {
             }
             else if (state === "退出") {
                 sleep(2000);
-                log("任务完成，准备重启......")   
+                toastLog("任务完成，准备重启......")   
                 jdUtils.restartJD();
                 break;
             }
@@ -197,7 +197,7 @@ function runFarmTasks() {
 
     // 去浇水
     if (enterFarm()) {
-        log("开始浇水......")
+        toastLog("开始浇水......")
         while (true) {                
             let bottle = textContains("点击水壶浇水").findOne(FIND_WIDGET_TIMEOUT)
             
@@ -220,7 +220,7 @@ function runFarmTasks() {
                 break;
             }                
         }    
-        log("浇水完成......")  
+        toastLog("浇水完成......")  
     }
     jdUtils.restartJD();
 }

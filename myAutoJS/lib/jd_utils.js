@@ -23,7 +23,7 @@ function findtextAndClick(tx, sleeptime) {
         }
         let flag = click(xp, yp)
         sleep(sleeptime)    
-        toastLog("click=" + tx + " flag=" + flag)    
+        // toastLog("click=" + tx + " flag=" + flag)    
         return flag
     }
     return false
@@ -73,7 +73,7 @@ function isPartialMatch(text, keywords) {
 function enterActivity(tx) {
     var can_join = false;
     for (var i = 0; i < 5; i++) {
-        log("第 " + (i + 1) + " 次尝试寻找: " + tx);
+        toastLog("第 " + (i + 1) + " 次尝试寻找: " + tx);
         
         // 1. 增加模糊匹配和描述匹配
         let myNode = text(tx).findOnce() || desc(tx).findOnce() || textContains(tx).findOnce();
@@ -82,14 +82,14 @@ function enterActivity(tx) {
             let b = myNode.bounds();
             // 只要控件有一部分在屏幕内 (比如左边界小于屏幕宽，右边界大于0)
             if (b.right > 0 && b.left < device.width && b.centerY() > 0 && b.centerY() < device.height) {
-                log("确定找到图标，准备点击...");
+                toastLog("确定找到图标，准备点击...");
                 // 注意：这里建议直接用 myNode.click()，如果不行再用坐标
                 can_join = findtextAndClick(tx, 3000);
                 break;
             }
         }
         
-        log("当前页未找到，执行滑动...");
+        toastLog("当前页未找到，执行滑动...");
         // 稍微加长滑动时长 (500ms)，让滑动更平稳
         swipe(device.width * 0.8, 550, device.width * 0.2, 550, 500);
         // 滑动后留出充足时间让 UI 渲染

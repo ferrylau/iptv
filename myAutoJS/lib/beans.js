@@ -110,26 +110,26 @@ function doTask() {
 
 function runTasks() {
     if(enterBeans()) {
-        log("开始签到种豆得豆...")        
+        toastLog("开始签到种豆得豆...")        
         sign()
         sleep(10000)
-        log("签到完成，准备重启......")   
+        toastLog("签到完成，准备重启......")   
         jdUtils.restartJD()      
     }
 
     if (enterBeans()) {
-        log("开始做种豆得豆任务...")
+        toastLog("开始做种豆得豆任务...")
         doTask()
         sleep(10000)
-        log("种豆得豆任务完成...")
+        toastLog("种豆得豆任务完成...")
         jdUtils.restartJD();
     }
 
     if(enterBeans()) {
-        log("开始收取收获值,种豆得豆...")        
+        toastLog("开始收取收获值,种豆得豆...")        
         getBeans()
         sleep(10000)
-        log("收获值完成，准备重启......")   
+        toastLog("收获值完成，准备重启......")   
         jdUtils.restartJD()      
     }    
 }
