@@ -32,14 +32,18 @@ function findtextAndClick(tx, sleeptime) {
 function startJD() {
     var loaded = false
     app.launchPackage("com.jingdong.app.mall")
+    sleep(3000)
     for (var i = 0; i < 20; i++) {
         // currentPackage() 是极其底层的系统调用，不扫描 UI 树，避开 Android 9 系统兼容问题
         if (currentPackage() === "com.jingdong.app.mall") {
             text("我的").waitFor();
+            sleep(2000)
             findtextAndClick("我的", 3000)
             text("浏览记录").waitFor();
+            sleep(2000)
             findtextAndClick("浏览记录", 3000)
             text("频道").waitFor();
+            sleep(2000)
             findtextAndClick("频道", 3000)
             text("我看过的频道").waitFor();            
             loaded = true;

@@ -3,6 +3,8 @@ let farm = require("./lib/farm.js");
 let miaosha = require("./lib/miaosha.js");
 let Beans = require("./lib/beans.js");
 let huafei = require("./lib/huafei.js");
+let car = require("./lib/car.js");
+let redpacket = require("./lib/redpacket.js");
 
 auto.waitFor();
 // console.show();
@@ -18,13 +20,17 @@ if (jdUtils.startJD()) {
     sleep(3000);
 
     // 开始东东农场任务
-    // farm.runFarmTasks();
+    farm.runFarmTasks();
     // 秒杀任务
-    // miaosha.runTasks();
+    miaosha.runTasks();
     // 种豆得豆
-    // Beans.runTasks();
-    // 退出
+    Beans.runTasks();
+    // 话费
     huafei.runTasks();
+    // 车
+    car.runTasks()
+    // 赚红包
+    redpacket.runTasks()
     jdUtils.exitJD();
   
 } else {
